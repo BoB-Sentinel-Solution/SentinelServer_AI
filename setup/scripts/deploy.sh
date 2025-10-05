@@ -42,8 +42,9 @@ bash "${BASE_DIR}/scripts/install_service.sh"
 echo "[CHECK] waiting for service to become healthy (max 10s)..."
 ok=0
 for i in {1..10}; do
-  if curl -sk --max-time 1 https://127.0.0.1/healthz >/dev/null; then
-    echo "Health OK on attempt $i"
+  resp="$(curl -sk --max-time 1 https://127.0.0.1/healthz || true)"
+  if echo "$resp" | grep -q '"ok"\s*:\s*true'; then
+    echo "Health OK on attempt $i -> $resp"
     ok=1
     break
   fi
@@ -55,9 +56,16 @@ for i in {1..10}; do
   sleep 1
 done
 
+# venv 경로 안내 (APP_DST가 없으면 기본값 사용)
+VENV_ACT="${APP_DST:-/home/ubuntu/sentinel}/.venv/bin/activate"
+
 if [ "$ok" -ne 1 ]; then
   echo "Health not ready after 10s"
-  # 진단용 마지막 시도 출력
-  curl -sk https://127.0.0.1/healthz || true
+  echo "Last response: ${resp:-<no response>}"
   journalctl -u sentinel -n 20 --no-pager || true
+else
+  echo
+  echo "[NEXT] 가상환경 활성화:"
+  echo "source $VENV_ACT"
+  echo "(비활성화: deactivate)"
 fi

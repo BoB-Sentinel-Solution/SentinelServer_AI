@@ -15,24 +15,32 @@ APP_DST="${APP_DST:-/home/ubuntu/sentinel}"
 RUN_USER="${RUN_USER:-ubuntu}"
 RUN_GROUP="${RUN_GROUP:-ubuntu}"
 
-echo "[APP] sync -> ${APP_DST}"
+echo "[APP] target -> ${APP_DST}"
 sudo install -d -m 755 -o "${RUN_USER}" -g "${RUN_GROUP}" "${APP_DST}"
 
-# 루트의 app.py 배포
-sudo install -m 644 -o "${RUN_USER}" -g "${RUN_GROUP}" "${REPO_ROOT}/app.py" "${APP_DST}/app.py"
-
-# 루트의 requirements.txt 배포
-if [[ -f "${REPO_ROOT}/requirements.txt" ]]; then
-  sudo install -m 644 -o "${RUN_USER}" -g "${RUN_GROUP}" "${REPO_ROOT}/requirements.txt" "${APP_DST}/requirements.txt"
+# 레포 루트와 배포 경로가 같은지 검사
+if [[ "$(realpath "${REPO_ROOT}")" == "$(realpath "${APP_DST}")" ]]; then
+  echo "[APP] REPO_ROOT == APP_DST (same directory). Skip file copy."
+else
+  echo "[APP] syncing files to ${APP_DST}"
+  # app.py
+  sudo install -m 644 -o "${RUN_USER}" -g "${RUN_GROUP}" "${REPO_ROOT}/app.py" "${APP_DST}/app.py"
+  # requirements.txt
+  if [[ -f "${REPO_ROOT}/requirements.txt" ]]; then
+    sudo install -m 644 -o "${RUN_USER}" -g "${RUN_GROUP}" "${REPO_ROOT}/requirements.txt" "${APP_DST}/requirements.txt"
+  fi
 fi
 
-# venv 구성 및 패키지 설치
-if [[ ! -d "${APP_DST}/.venv" ]]; then
-  echo "[APP] create venv"
+# venv 생성
+if [[ ! -x "${APP_DST}/.venv/bin/python" ]]; then
+  echo "[APP] creating venv..."
   sudo -u "${RUN_USER}" -g "${RUN_GROUP}" bash -c "cd '${APP_DST}' && python3 -m venv .venv"
 fi
 
-echo "[APP] install deps"
-sudo -u "${RUN_USER}" -g "${RUN_GROUP}" bash -c "source '${APP_DST}/.venv/bin/activate' && pip install --upgrade pip && pip install -r '${APP_DST}/requirements.txt'"
+# 패키지 설치(항상 최신화)
+echo "[APP] installing deps..."
+sudo -u "${RUN_USER}" -g "${RUN_GROUP}" bash -c "source '${APP_DST}/.venv/bin/activate' && \
+  pip install --upgrade pip && \
+  pip install -r '${APP_DST}/requirements.txt'"
 
 echo "[APP] done."

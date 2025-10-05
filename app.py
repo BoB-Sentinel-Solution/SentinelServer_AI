@@ -1,19 +1,9 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from routers.logs import router as logs_router
 
-app = FastAPI()
+def create_app() -> FastAPI:
+    app = FastAPI(title="Sentinel Solution Server", version="1.1.0")
+    app.include_router(logs_router)
+    return app
 
-class InItem(BaseModel):
-    time: str
-    host: str
-    prompt: str
-    interface: str
-
-@app.get("/healthz")
-def healthz():
-    return {"ok": True}
-
-@app.post("/logs")
-def ingest(item: InItem):
-    # TODO: 중요정보 판별/마스킹 로직
-    return {"action": "allow", "modified_prompt": item.prompt}
+app = create_app()

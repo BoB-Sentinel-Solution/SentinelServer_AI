@@ -65,7 +65,9 @@ if [ "$ok" -ne 1 ]; then
   journalctl -u sentinel -n 20 --no-pager || true
 else
   echo
-  echo "[NEXT] 가상환경 활성화:"
+  echo "[Guide] Activation of virtual environment:"
   echo "source $VENV_ACT"
-  echo "(비활성화: deactivate)"
+  echo "(deactivate: deactivate)"
+  echo "[Guide] Server Monitoring"
+  echo "sudo journalctl -u sentinel -n 100 -f"
 fi

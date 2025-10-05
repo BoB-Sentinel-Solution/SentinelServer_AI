@@ -38,10 +38,26 @@ bash "${BASE_DIR}/scripts/generate_self_signed.sh"
 # systemd 서비스
 bash "${BASE_DIR}/scripts/install_service.sh"
 
-# 헬스체크
-echo "[CHECK] curl -k https://127.0.0.1/healthz"
-curl -k https://127.0.0.1/healthz || true
+# --- Health check (max 10s, every 1s) ---
+echo "[CHECK] waiting for service to become healthy (max 10s)..."
+ok=0
+for i in {1..10}; do
+  if curl -sk --max-time 1 https://127.0.0.1/healthz >/dev/null; then
+    echo "Health OK on attempt $i"
+    ok=1
+    break
+  fi
+  if sudo ss -ltnp | grep -q ':443'; then
+    echo "443 is listening, retrying health... (attempt $i)"
+  else
+    echo "443 not listening yet (attempt $i)"
+  fi
+  sleep 1
+done
 
-echo "[DONE] Deployment finished."
-echo "Service:    systemctl status sentinel"
-echo "Health:     curl -k https://${SERVER_IP:-<YOUR_IP>}/healthz"
+if [ "$ok" -ne 1 ]; then
+  echo "Health not ready after 10s"
+  # 진단용 마지막 시도 출력
+  curl -sk https://127.0.0.1/healthz || true
+  journalctl -u sentinel -n 20 --no-pager || true
+fi

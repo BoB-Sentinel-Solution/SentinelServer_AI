@@ -1,33 +1,37 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
-# === Agent -> Server ===
+# === Agent -> Server (요청) ===
 class Attachment(BaseModel):
-    format: Optional[str] = None   # 예: "image/png", 없으면 None
-    data: Optional[str] = None     # base64 문자열, 없으면 None
+    format: Optional[str] = None   # 예: "image/png" | null
+    data: Optional[str] = None     # base64 | null
 
 class InItem(BaseModel):
     time: str
     public_ip: Optional[str] = None
     private_ip: Optional[str] = None
-    host: Optional[str] = None
-    hostname: Optional[str] = None
+    host: Optional[str] = None           # 실제 LLM 대상 호스트 (예: chatgpt.com)
+    hostname: Optional[str] = None       # 에이전트 PC 호스트명
     prompt: str
     attachment: Optional[Attachment] = None
     interface: str = "llm"
 
-# === Server -> Agent ===
+# === Server -> Agent (응답) ===
 class Entity(BaseModel):
-    type: str
     value: str
+    begin: int
+    end: int
+    label: str
 
-class DetectResponse(BaseModel):
-    has_sensitive: bool = False
-    entities: List[Entity] = Field(default_factory=list)
+class ServerOut(BaseModel):
+    request_id: str
+    host: str
     modified_prompt: str
+    has_sensitive: bool
+    entities: List[Entity] = Field(default_factory=list)
+    processing_ms: int
 
-# (옵션) 내부 디버깅/로그용
-class OcrDebug(BaseModel):
-    used: bool = False
-    reason: Optional[str] = None
-    chars: int = 0
+    # 파일 제어 추가
+    file_blocked: bool = False   # 첨부 민감 시 업로드 차단
+    allow: bool = True           # 최종 허용 여부
+    action: str = "allow"        # "allow" | "mask_and_allow" | "block_upload"

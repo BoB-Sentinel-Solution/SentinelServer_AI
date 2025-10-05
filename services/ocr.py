@@ -5,72 +5,64 @@ from utils.imaging import (
     load_image_from_base64, decode_base64_to_bytes
 )
 
-# pytesseract는 선택 설치. 없으면 graceful fallback.
+# Optional deps (없으면 우회)
 try:
     import pytesseract
-    _has_tesseract = True
+    _HAS_TESSERACT = True
 except Exception:
-    _has_tesseract = False
+    _HAS_TESSERACT = False
 
-# PDF → 이미지 변환도 선택 설치
 try:
     from pdf2image import convert_from_bytes
-    _has_pdf2image = True
+    _HAS_PDF2IMAGE = True
 except Exception:
-    _has_pdf2image = False
+    _HAS_PDF2IMAGE = False
 
 
 class OcrService:
-    """
-    - needs_ocr: 첨부 존재 + 지원 포맷인지 판정
-    - run_ocr: 실제 OCR 실행 (이미지/ PDF)
-    """
     @staticmethod
     def needs_ocr(item: InItem) -> Tuple[bool, str]:
         att = item.attachment
         if not att or not att.format or not att.data:
             return (False, "no_attachment")
-        mime = att.format.lower().strip()
-        if is_supported_image_mime(mime):
+        if is_supported_image_mime(att.format):
             return (True, "image")
-        if is_supported_pdf_mime(mime):
+        if is_supported_pdf_mime(att.format):
             return (True, "pdf")
-        return (False, f"unsupported_mime:{mime}")
+        return (False, f"unsupported_mime:{att.format}")
 
     @staticmethod
     def run_ocr(item: InItem) -> Tuple[str, bool, str]:
         """
-        Returns: (ocr_text, used, reason)
-        - used: 실제 OCR 수행 여부
-        - reason: 수행/미수행 사유 텍스트
+        Returns: (text, used, reason)
+        used=True일 때만 OCR 실행됨.
         """
-        need, reason = OcrService.needs_ocr(item)
+        need, why = OcrService.needs_ocr(item)
         if not need:
-            return ("", False, reason)
+            return ("", False, why)
 
-        if not _has_tesseract:
+        if not _HAS_TESSERACT:
             return ("", False, "pytesseract_not_installed")
 
-        mime = item.attachment.format.lower().strip()
+        fmt = (item.attachment.format or "").lower().strip()
         data_b64 = item.attachment.data
 
         try:
-            if is_supported_image_mime(mime):
+            if is_supported_image_mime(fmt):
                 img = load_image_from_base64(data_b64)
                 text = pytesseract.image_to_string(img)
                 return (text or "", True, "ocr_image_ok")
 
-            if is_supported_pdf_mime(mime):
-                if not _has_pdf2image:
+            if is_supported_pdf_mime(fmt):
+                if not _HAS_PDF2IMAGE:
                     return ("", False, "pdf2image_not_installed")
                 pdf_bytes = decode_base64_to_bytes(data_b64)
                 pages = convert_from_bytes(pdf_bytes, dpi=200)
-                texts = []
+                chunks = []
                 for p in pages:
-                    texts.append(pytesseract.image_to_string(p))
-                return ("\n".join(filter(None, texts)), True, "ocr_pdf_ok")
+                    chunks.append(pytesseract.image_to_string(p))
+                return ("\n".join(ch for ch in chunks if ch), True, "ocr_pdf_ok")
 
-            return ("", False, "mime_switched")  # 논리적으로 여기 안 옴
-
+            return ("", False, "mime_mismatch")
         except Exception as e:
             return ("", False, f"ocr_error:{e!r}")

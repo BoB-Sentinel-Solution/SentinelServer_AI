@@ -18,7 +18,7 @@ RUN_GROUP="${RUN_GROUP:-ubuntu}"
 echo "[APP] target -> ${APP_DST}"
 sudo install -d -m 755 -o "${RUN_USER}" -g "${RUN_GROUP}" "${APP_DST}"
 
-# 레포 루트와 배포 경로가 같은지 검사
+# 레포 루트와 배포 경로가 같은 경우 파일 복사 스킵
 if [[ "$(realpath "${REPO_ROOT}")" == "$(realpath "${APP_DST}")" ]]; then
   echo "[APP] REPO_ROOT == APP_DST (same directory). Skip file copy."
 else
@@ -31,13 +31,13 @@ else
   fi
 fi
 
-# venv 생성
+# venv 생성 (없으면 생성)
 if [[ ! -x "${APP_DST}/.venv/bin/python" ]]; then
   echo "[APP] creating venv..."
   sudo -u "${RUN_USER}" -g "${RUN_GROUP}" bash -c "cd '${APP_DST}' && python3 -m venv .venv"
 fi
 
-# 패키지 설치(항상 최신화)
+# 패키지 설치/업데이트 (항상 수행)
 echo "[APP] installing deps..."
 sudo -u "${RUN_USER}" -g "${RUN_GROUP}" bash -c "source '${APP_DST}/.venv/bin/activate' && \
   pip install --upgrade pip && \

@@ -1,3 +1,4 @@
+# schemas.py
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
@@ -10,8 +11,8 @@ class InItem(BaseModel):
     time: str
     public_ip: Optional[str] = None
     private_ip: Optional[str] = None
-    host: Optional[str] = None           # 실제 LLM 대상 호스트 (예: chatgpt.com)
-    hostname: Optional[str] = None       # 에이전트 PC 호스트명
+    host: Optional[str] = None
+    hostname: Optional[str] = None
     prompt: str
     attachment: Optional[Attachment] = None
     interface: str = "llm"
@@ -30,8 +31,6 @@ class ServerOut(BaseModel):
     has_sensitive: bool
     entities: List[Entity] = Field(default_factory=list)
     processing_ms: int
-
-    # 파일 제어 추가
-    file_blocked: bool = False   # 첨부 민감 시 업로드 차단
-    allow: bool = True           # 최종 허용 여부
-    action: str = "allow"        # "allow" | "mask_and_allow" | "block_upload"
+    file_blocked: bool = False
+    allow: bool = True
+    action: str = "allow"

@@ -1,3 +1,4 @@
+# services/ocr.py
 from typing import Tuple
 from schemas import InItem
 from utils.imaging import (
@@ -5,7 +6,6 @@ from utils.imaging import (
     load_image_from_base64, decode_base64_to_bytes
 )
 
-# Optional deps (없으면 우회)
 try:
     import pytesseract
     _HAS_TESSERACT = True
@@ -17,7 +17,6 @@ try:
     _HAS_PDF2IMAGE = True
 except Exception:
     _HAS_PDF2IMAGE = False
-
 
 class OcrService:
     @staticmethod
@@ -33,10 +32,6 @@ class OcrService:
 
     @staticmethod
     def run_ocr(item: InItem) -> Tuple[str, bool, str]:
-        """
-        Returns: (text, used, reason)
-        used=True일 때만 OCR 실행됨.
-        """
         need, why = OcrService.needs_ocr(item)
         if not need:
             return ("", False, why)

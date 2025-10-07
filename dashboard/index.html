@@ -4,79 +4,127 @@
   <meta charset="utf-8" />
   <title>Sentinel Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- 기본 스타일 -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <!-- reset: jsdelivr 허용이라 그대로 사용 -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset/dist/reset.min.css">
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b1020; color:#eef1f6; }
-    .wrap { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
-    h1 { font-size: 28px; margin: 8px 0 20px; }
-    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
-    .card { background:#121a36; border:1px solid #1f2a4a; border-radius: 14px; padding: 16px; }
-    .span-3 { grid-column: span 3; }
-    .span-4 { grid-column: span 4; }
-    .span-6 { grid-column: span 6; }
-    .span-8 { grid-column: span 8; }
-    .num { font-size: 40px; font-weight: 700; }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th, td { padding: 8px 10px; border-bottom: 1px solid #223255; }
-    .muted { color:#a9b3c9; }
-    .badge { display:inline-block; background:#1e2b52; color:#cfe0ff; padding:2px 8px; border-radius:999px; font-size:12px; }
-    .footer { margin: 16px 0; color:#97a6c0; font-size: 12px; }
+    :root{
+      --bg:#0b1020; --card:#121a36; --border:#1f2a4a; --text:#eef1f6; --muted:#a9b3c9;
+      --accent:#3b82f6; --accent2:#22c55e; --accent3:#eab308; --accent4:#ef4444;
+      --gap:16px;
+      --chart-h: clamp(220px, 28vh, 360px); /* 화면 높이에 맞춰 차트 높이 반응형 */
+      --card-radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    .wrap{max-width:1280px;margin:24px auto;padding:0 16px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    h1{font-size:28px;margin:0}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:var(--gap)}
+    .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:var(--gap)}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--card-radius);padding:16px;min-width:0}
+    .title{font-weight:600;margin-bottom:8px}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--gap)}
+    .kpi{display:flex;align-items:center;gap:12px}
+    .kpi .num{font-size:40px;font-weight:800;line-height:1}
+    .muted{color:var(--muted)}
+    .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#1e2b52;color:#cfe0ff;font-size:12px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .grow{flex:1}
+    .chart{height:var(--chart-h)} /* 차트 캔버스 부모 */
+    .chart > canvas{width:100% !important;height:100% !important}
+    table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
+    th,td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;overflow:hidden;text-overflow:ellipsis}
+    th{color:#cfe0ff;text-align:left}
+    .logs-wrap{max-height:clamp(220px, 34vh, 460px);overflow:auto;border-radius:10px;border:1px solid var(--border)}
+    @media (max-width: 480px){
+      .kpi .num{font-size:32px}
+    }
   </style>
-  <!-- Chart.js -->
+  <!-- 차트: CDN 그대로/또는 로컬 vendor로 교체 가능 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="wrap">
-    <h1>Sentinel Dashboard</h1>
+    <header>
+      <h1>Sentinel Dashboard</h1>
+      <div class="muted">Auto Refresh 10s</div>
+    </header>
 
-    <div class="grid">
-      <div class="card span-3">
-        <div class="muted">총 중요정보 탐지건수</div>
-        <div id="total" class="num">-</div>
+    <!-- KPI -->
+    <section class="kpis" style="margin-bottom:8px">
+      <div class="card">
+        <div class="kpi">
+          <div class="num" id="kpiTotal">-</div>
+          <div class="muted">총 중요정보 탐지건수</div>
+        </div>
       </div>
-
-      <div class="card span-4">
-        <div class="muted">중요정보 유형 비율</div>
-        <canvas id="chartRatio" height="140"></canvas>
+      <div class="card">
+        <div class="kpi">
+          <div class="num" id="kpiBlocked">-</div>
+          <div class="muted">총 차단건수</div>
+        </div>
       </div>
-
-      <div class="card span-5">
-        <div class="muted">최근 7일간(시간대) 입력 시도</div>
-        <canvas id="chartHourly" height="140"></canvas>
+      <div class="card">
+        <div class="row">
+          <div class="muted">데이터 소스:</div><div class="badge">sentinel.db</div>
+          <div class="grow"></div>
+          <div class="badge" id="lastRefreshed">-</div>
+        </div>
       </div>
+    </section>
 
-      <div class="card span-4">
-        <div class="muted">중요정보 유형별 차단 횟수</div>
-        <canvas id="chartBlocked" height="160"></canvas>
+    <!-- 메인 차트 2열 -->
+    <section class="grid-2" style="margin-bottom:8px">
+      <div class="card">
+        <div class="title">최근 7일간(시간대) 입력 시도</div>
+        <div class="chart"><canvas id="chartHourly"></canvas></div>
       </div>
-
-      <div class="card span-4">
-        <div class="muted">IP 대역 별 차단 건수 (/16)</div>
-        <canvas id="chartIpBand" height="160"></canvas>
+      <div class="card">
+        <div class="title">중요정보 유형별 차단 횟수</div>
+        <div class="chart"><canvas id="chartBlocked"></canvas></div>
       </div>
+    </section>
 
-      <div class="card span-4">
-        <div class="muted">설정</div>
-        <div class="badge">Auto Refresh 10s</div>
-        <div class="muted" style="margin-top:8px;">데이터 소스: sentinel.db</div>
+    <!-- 서브 차트 2열 -->
+    <section class="grid-2" style="margin-bottom:8px">
+      <div class="card">
+        <div class="title">중요정보 유형 비율</div>
+        <div class="chart"><canvas id="chartRatio"></canvas></div>
       </div>
-
-      <div class="card span-12">
-        <div class="muted">실시간 탐지 로그 (최근 20건)</div>
-        <table id="logs">
-          <thead>
-            <tr><th>시간</th><th>호스트</th><th>호스트명</th><th>공인 IP</th><th>액션</th><th>민감</th><th>파일차단</th><th>엔티티</th><th>프롬프트</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+      <div class="card">
+        <div class="title">IP 대역별 차단 건수 (/16)</div>
+        <div class="chart"><canvas id="chartIpBand"></canvas></div>
       </div>
-    </div>
+    </section>
 
-    <div class="footer">© Sentinel</div>
+    <!-- 로그 -->
+    <section class="grid">
+      <div class="card">
+        <div class="title">실시간 탐지 로그 (최근 20건)</div>
+        <div class="logs-wrap">
+          <table id="logs">
+            <thead>
+              <tr>
+                <th style="width:160px">시간</th>
+                <th style="width:120px">호스트</th>
+                <th style="width:140px">호스트명</th>
+                <th style="width:130px">공인 IP</th>
+                <th style="width:120px">액션</th>
+                <th style="width:70px">민감</th>
+                <th style="width:90px">파일차단</th>
+                <th style="width:140px">엔티티</th>
+                <th>프롬프트</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </div>
 
+  <!-- 개발 중 CDN 유지. 운영에선 로컬: /dashboard/static/vendor/chart.umd.min.js -->
   <script src="/dashboard/static/app.js"></script>
 </body>
 </html>

@@ -1,117 +1,142 @@
-// dashboard/app.js  (XSS 완화 + API Key 옵션 + 캐시 방지)
-
 async function fetchSummary() {
-  const headers = { 'Cache-Control': 'no-store' };
-
-  // 대시보드 API 키를 사용하는 경우에만 헤더 추가
-  //   - 서버의 config.py(.env)에서 DASHBOARD_API_KEY가 설정되어 있다면,
-  //     아래 상수에 동일 값을 넣거나, Nginx Basic Auth 등 다른 보호 수단을 권장.
-  const ADMIN_KEY = null; // 예: 'p4eHk9...'; 공개 노출 위험 있으니 필요 시 프록시 인증 사용 권장
-  if (ADMIN_KEY) headers['X-Admin-Key'] = ADMIN_KEY;
-
-  const res = await fetch('/dashboard/api/summary', { headers });
+  const res = await fetch('/dashboard/api/summary');
   if (!res.ok) throw new Error('failed to load summary');
   return await res.json();
 }
 
 function toLabelsValues(obj) {
-  obj = obj || {};
-  const labels = Object.keys(obj);
+  const labels = Object.keys(obj || {});
   const values = labels.map(k => obj[k]);
   return { labels, values };
 }
 
 let ratioChart, hourlyChart, blockedChart, ipBandChart;
 
+// 공통 차트 옵션: 부모 크기 맞춤 + 다크 테마
+function baseOptions() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,          // 부모 .chart 높이에 맞춤
+    plugins: { legend: { labels: { color: '#cfe0ff' } } },
+    scales: {
+      x: { ticks: { color: '#cfe0ff' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+      y: { beginAtZero: true, ticks: { color: '#cfe0ff' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+    },
+    elements: { line: { tension: .3 } }
+  };
+}
+
+function makeResizeAware(chart, el) {
+  // 컨테이너 크기 변화 감지 시 차트 리사이즈
+  const ro = new ResizeObserver(() => chart.resize());
+  ro.observe(el);
+  return ro;
+}
+
+let observers = [];
+
 function renderCharts(data) {
-  // 총 건수 - 안전하게 텍스트만 삽입
-  const totalEl = document.getElementById('total');
-  totalEl.textContent = data.total_sensitive ?? 0;
+  // KPI
+  const totalSensitive = data.total_sensitive ?? 0;
+  const totalBlocked = Object.values(data.type_blocked || {}).reduce((a, b) => a + b, 0);
+  document.getElementById('kpiTotal').textContent = totalSensitive;
+  document.getElementById('kpiBlocked').textContent = totalBlocked;
+  document.getElementById('lastRefreshed').textContent = new Date().toLocaleString();
 
-  // 유형 비율
-  const ratio = toLabelsValues(data.type_ratio);
-  if (ratioChart) ratioChart.destroy();
-  ratioChart = new Chart(document.getElementById('chartRatio'), {
-    type: 'doughnut',
-    data: { labels: ratio.labels, datasets: [{ data: ratio.values }] },
-    options: { plugins: { legend: { position: 'right', labels: { color: '#eef1f6' } } } }
-  });
+  // 기존 옵저버 해제
+  observers.forEach(o => o.disconnect?.());
+  observers = [];
 
-  // 시간대별 입력 시도 (0~23)
-  const hours = Array.from({ length: 24 }, (_, i) => i);
+  // 시간대별
+  const hours = Array.from({length:24}, (_,i)=>i);
   if (hourlyChart) hourlyChart.destroy();
+  const hourlyEl = document.getElementById('chartHourly').parentElement;
   hourlyChart = new Chart(document.getElementById('chartHourly'), {
     type: 'line',
     data: {
       labels: hours,
-      datasets: [{ label: '시도 건수', data: data.hourly_attempts || [], tension: .2 }]
+      datasets: [{
+        label: '시도 건수',
+        data: data.hourly_attempts || [],
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,.25)',
+        pointRadius: 2
+      }]
     },
-    options: {
-      scales: {
-        x: { ticks: { color: '#cfe0ff' } },
-        y: { ticks: { color: '#cfe0ff' } }
-      },
-      plugins: { legend: { labels: { color: '#eef1f6' } } }
-    }
+    options: baseOptions()
   });
+  observers.push(makeResizeAware(hourlyChart, hourlyEl));
 
   // 유형별 차단
-  const blocked = toLabelsValues(data.type_blocked);
+  const blocked = toLabelsValues(data.type_blocked || {});
   if (blockedChart) blockedChart.destroy();
+  const blockedEl = document.getElementById('chartBlocked').parentElement;
   blockedChart = new Chart(document.getElementById('chartBlocked'), {
     type: 'bar',
-    data: { labels: blocked.labels, datasets: [{ label: '차단', data: blocked.values }] },
+    data: {
+      labels: blocked.labels,
+      datasets: [{ label:'차단', data: blocked.values, backgroundColor: '#ef4444' }]
+    },
+    options: baseOptions()
+  });
+  observers.push(makeResizeAware(blockedChart, blockedEl));
+
+  // 유형 비율
+  const ratio = toLabelsValues(data.type_ratio || {});
+  if (ratioChart) ratioChart.destroy();
+  const ratioEl = document.getElementById('chartRatio').parentElement;
+  ratioChart = new Chart(document.getElementById('chartRatio'), {
+    type: 'doughnut',
+    data: {
+      labels: ratio.labels,
+      datasets: [{
+        data: ratio.values,
+        backgroundColor: ['#3b82f6','#22c55e','#eab308','#ef4444','#8b5cf6','#14b8a6']
+      }]
+    },
     options: {
-      scales: {
-        x: { ticks: { color: '#cfe0ff' } },
-        y: { ticks: { color: '#cfe0ff' } }
-      },
-      plugins: { legend: { labels: { color: '#eef1f6' } } }
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position:'right', labels:{ color:'#cfe0ff' } } }
     }
   });
+  observers.push(makeResizeAware(ratioChart, ratioEl));
 
   // IP 대역 차단
-  const ipb = toLabelsValues(data.ip_band_blocked);
+  const ipb = toLabelsValues(data.ip_band_blocked || {});
   if (ipBandChart) ipBandChart.destroy();
+  const ipEl = document.getElementById('chartIpBand').parentElement;
   ipBandChart = new Chart(document.getElementById('chartIpBand'), {
     type: 'bar',
-    data: { labels: ipb.labels, datasets: [{ label: '차단', data: ipb.values }] },
-    options: {
-      scales: {
-        x: { ticks: { color: '#cfe0ff' } },
-        y: { ticks: { color: '#cfe0ff' } }
-      },
-      plugins: { legend: { labels: { color: '#eef1f6' } } }
-    }
+    data: { labels: ipb.labels, datasets: [{ label:'차단', data: ipb.values, backgroundColor: '#22c55e' }] },
+    options: baseOptions()
   });
-}
-
-// ✅ XSS 차단: innerHTML 사용 금지. 셀은 createElement + textContent로만 생성.
-function td(text) {
-  const c = document.createElement('td');
-  c.textContent = text ?? '';
-  return c;
+  observers.push(makeResizeAware(ipBandChart, ipEl));
 }
 
 function renderLogs(data) {
   const tbody = document.querySelector('#logs tbody');
-  // 기존 노드 제거(스크롤/메모리 누수 방지)
-  tbody.textContent = '';
-
+  tbody.innerHTML = '';
   (data.recent_logs || []).forEach(row => {
-    const tr = document.createElement('tr');
     const ents = (row.entities || []).map(e => e.label).join(', ');
-
-    tr.appendChild(td(row.time || ''));
-    tr.appendChild(td(row.host || ''));
-    tr.appendChild(td(row.hostname || ''));
-    tr.appendChild(td(row.public_ip || ''));
-    tr.appendChild(td(row.action || ''));
-    tr.appendChild(td(row.has_sensitive ? 'Y' : 'N'));
-    tr.appendChild(td(row.file_blocked ? 'Y' : 'N'));
-    tr.appendChild(td(ents));
-    tr.appendChild(td(row.prompt || ''));
-
+    const tr = document.createElement('tr');
+    const cols = [
+      row.time || '', row.host || '', row.hostname || '', row.public_ip || '',
+      row.action || '', (row.has_sensitive ? 'Y' : 'N'), (row.file_blocked ? 'Y' : 'N'),
+      ents || '', row.prompt || ''
+    ];
+    cols.forEach((c, idx) => {
+      const td = document.createElement('td');
+      if (idx === 4) { // 액션
+        const span = document.createElement('span');
+        span.className = 'badge';
+        span.textContent = c;
+        td.appendChild(span);
+      } else {
+        td.textContent = c;
+      }
+      tr.appendChild(td);
+    });
     tbody.appendChild(tr);
   });
 }
@@ -127,4 +152,4 @@ async function refresh() {
 }
 
 refresh();
-setInterval(refresh, 10000); // 10초마다 갱신
+setInterval(refresh, 10000);

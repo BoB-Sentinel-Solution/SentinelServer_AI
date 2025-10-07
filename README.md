@@ -18,3 +18,21 @@ systemctl status sentinel
 journalctl -u sentinel -f
 curl -k https://<SERVER_IP>/healthz
  ```
+
+### Delete
+```
+기본(확인 후 진행)
+cd ~/SentinelServer_AI/uninstall
+sudo bash uninstall.sh
+
+무확인 전체 제거(서비스/코드/venv/DB/인증서)
+sudo bash uninstall.sh --force
+
+DB는 남기고 나머지만 제거
+sudo bash uninstall.sh --force --keep-db
+
+서비스만 제거(코드/DB/파일은 유지)
+sudo bash uninstall.sh --only-service
+```
+코드 복사
+sudo bash uninstall.sh --only-service

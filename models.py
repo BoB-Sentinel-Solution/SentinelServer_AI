@@ -2,6 +2,7 @@
 from sqlalchemy import Column, String, Boolean, Integer, DateTime, JSON, Text
 from sqlalchemy.sql import func
 from db import Base
+from datetime import datetime
 
 class LogRecord(Base):
     """
@@ -34,4 +35,4 @@ class LogRecord(Base):
     action          = Column(String, default="allow")
 
     # 메타
-    created_at      = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at      = Column(DateTime(timezone=True), default=datetime.now, nullable=False)

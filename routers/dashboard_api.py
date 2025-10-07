@@ -1,6 +1,6 @@
 # routers/dashboard_api.py
 from __future__ import annotations
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException, status  # 추가
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
@@ -10,6 +10,7 @@ from datetime import datetime
 
 from db import SessionLocal, Base, engine
 from models import LogRecord
+from config import settings  # 추가
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 DASHBOARD_DIR = BASE_DIR / "dashboard"
@@ -30,6 +31,19 @@ def get_db():
     finally:
         db.close()
 
+# 대시보드 API 보호: .env에 DASHBOARD_API_KEY 설정 시에만 검사
+def require_admin(x_admin_key: str | None = Header(default=None)):
+    """
+    - 설정에 DASHBOARD_API_KEY가 비어있지 않으면, 요청 헤더 X-Admin-Key 검증
+    - 비어있다면(설정 안했으면) 기존과 동일하게 무인증 허용
+    """
+    if settings.DASHBOARD_API_KEY:
+        if x_admin_key != settings.DASHBOARD_API_KEY:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid API key",
+            )
+
 @router.get("/dashboard/")
 def dashboard_index():
     """ /dashboard/ → 정적 index.html """
@@ -43,7 +57,7 @@ def dashboard_redirect_root():
     """ /dashboard → /dashboard/ 로 정규화 """
     return RedirectResponse(url="/dashboard/")
 
-@router.get("/dashboard/api/summary")
+@router.get("/dashboard/api/summary", dependencies=[Depends(require_admin)])  # API 키 요구
 def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """
     대시보드 데이터 한 번에 제공
@@ -74,7 +88,7 @@ def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 type_ratio[label] += 1
 
         # 차단 집계
-        if not r.allow or r.action.startswith("block"):
+        if not r.allow or (r.action or "").startswith("block"):
             # 엔티티 기반 차단
             if r.entities:
                 for e in r.entities:
@@ -97,7 +111,7 @@ def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
             except Exception:
                 pass
 
-        # 최근 로그 20건
+        # 최근 로그 20건  XSS 완화: 민감값(value) 미노출, 레이블만 보여줌
         if len(recent_logs) < 20:
             recent_logs.append({
                 "time": r.created_at.isoformat() if r.created_at else r.time,
@@ -107,17 +121,19 @@ def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 "action": r.action,
                 "has_sensitive": r.has_sensitive,
                 "file_blocked": r.file_blocked,
-                "entities": r.entities or [],
-                "prompt": (r.prompt[:120] + "…") if r.prompt and len(r.prompt) > 120 else r.prompt,
+                # 엔티티는 label만 노출(값/인덱스 제거)
+                "entities": [{"label": (e.get("label") or "")} for e in (r.entities or [])],
+                # 프롬프트는 서버에서 120자 미리보기만 전달(프론트는 textContent로 렌더)
+                "prompt": (r.prompt[:120] + "…") if r.prompt and len(r.prompt) > 120 else (r.prompt or ""),
             })
 
-    # 프론트가 보기 쉽게 dict 변환
+    # 프론트가 보기 쉽게 dict 변환 (Starlette/JSON 직렬화 일관성)
     resp = {
         "total_sensitive": total_sensitive,
-        "type_ratio": type_ratio,
-        "type_blocked": type_blocked,
+        "type_ratio": dict(type_ratio),
+        "type_blocked": dict(type_blocked),
         "hourly_attempts": hourly_attempts,
         "recent_logs": recent_logs,
-        "ip_band_blocked": ip_band_blocked,
+        "ip_band_blocked": dict(ip_band_blocked),
     }
     return resp

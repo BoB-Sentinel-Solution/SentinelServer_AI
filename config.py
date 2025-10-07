@@ -29,6 +29,10 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = Field(default=DEFAULT_SQLITE_URL, description="SQLAlchemy Database URL")
 
+    # 대시보드 요약 API 보호용 키
+    # .env 예시: DASHBOARD_API_KEY="p4eHk9...랜덤..."
+    DASHBOARD_API_KEY: str | None = Field(default=None)
+
     # pydantic v2 설정: .env 사용, 여분 필드 무시
     model_config = SettingsConfigDict(
         env_file=".env",

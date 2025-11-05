@@ -1,80 +1,98 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# 위치: ~/SentinelServer_AI/setup/scripts/deploy.sh
+
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_ROOT="$(dirname "${BASE_DIR}")"
+REPO_ROOT="$(cd "${BASE_DIR}/.." && pwd)"
+ENV_FILE="${BASE_DIR}/.env"
 
-# 실행 권한 부여(최초 1회)
-chmod +x "${BASE_DIR}/scripts/"*.sh || true
+# 실행 권한
+chmod +x "${BASE_DIR}/scripts/"*.sh 2>/dev/null || true
 
-# .env 로드 (APP_DST, RUN_USER/GROUP, SERVER_IP, TZ_NAME 등)
-if [[ -f "${BASE_DIR}/.env" ]]; then
-  set -o allexport
-  source "${BASE_DIR}/.env"
-  set +o allexport
+# .env 로드
+if [[ -f "${ENV_FILE}" ]]; then
+  set -o allexport; source "${ENV_FILE}"; set +o allexport
 else
-  echo "NOTE: ${BASE_DIR}/.env not found. Using defaults or .env.example values if exported."
+  echo "NOTE: ${ENV_FILE} not found. Using defaults."
 fi
 
-echo "[SYS] install base packages"
-sudo apt-get update -y
-sudo apt-get install -y python3-venv openssl rsync curl
+# 기본값
+DOMAIN="${DOMAIN:-bobsentinel.com}"
+WWW_DOMAIN="${WWW_DOMAIN:-www.bobsentinel.com}"
+APP_DST="${APP_DST:-${REPO_ROOT}}"
+TZ_NAME="${TZ_NAME:-Asia/Seoul}"
 
-# --- Timezone setup (uses $TZ_NAME, default Asia/Seoul) ---
-bash "${BASE_DIR}/scripts/setup_timezone.sh"
+echo "[CONF] DOMAIN=${DOMAIN}, WWW_DOMAIN=${WWW_DOMAIN}, APP_DST=${APP_DST}, TZ=${TZ_NAME}"
 
-# 방화벽
-bash "${BASE_DIR}/scripts/setup_firewall.sh"
+echo "[SYS] base packages"
+apt-get update -y
+apt-get install -y python3-venv python3-pip rsync curl openssl certbot gettext-base
 
-# 앱 동기화 + venv + deps (루트 app.py/requirements.txt 사용)
-bash "${BASE_DIR}/scripts/sync_app.sh"
+# 타임존/방화벽 유지 호출 (있을 때만)
+[[ -x "${BASE_DIR}/scripts/setup_timezone.sh" ]]  && bash "${BASE_DIR}/scripts/setup_timezone.sh"  || timedatectl set-timezone "${TZ_NAME}" || true
+[[ -x "${BASE_DIR}/scripts/setup_firewall.sh" ]] && bash "${BASE_DIR}/scripts/setup_firewall.sh" || { command -v ufw >/dev/null 2>&1 && ufw allow 80,443/tcp || true; }
 
-# 인증서 (SERVER_IP 자동 감지 보조)
-if [[ -z "${SERVER_IP:-}" ]]; then
-  echo "WARNING: SERVER_IP not set; auto-detect public IP..."
-  SERVER_IP="$(curl -s https://ifconfig.me || true)"
-  export SERVER_IP
-  echo "Detected SERVER_IP=${SERVER_IP}"
+# 앱 동기화 + venv (기존 로직 유지)
+if [[ -x "${BASE_DIR}/scripts/sync_app.sh" ]]; then
+  bash "${BASE_DIR}/scripts/sync_app.sh"
+else
+  echo "[APP] sync to ${APP_DST}"
+  mkdir -p "${APP_DST}"
+  rsync -av --delete --exclude ".git" --exclude "__pycache__" --exclude ".venv" "${REPO_ROOT}/" "${APP_DST}/"
+  cd "${APP_DST}"
+  python3 -m venv .venv
+  source .venv/bin/activate
+  pip install --upgrade pip
+  [[ -f requirements.txt ]] && pip install -r requirements.txt
+  deactivate
 fi
+
+# (1) self-signed 생성(초기 가동용/백업용) — 기존 호출 유지
 bash "${BASE_DIR}/scripts/generate_self_signed.sh"
 
-# systemd 서비스
+# (2) Let's Encrypt 자동 발급 — 실패해도 self-signed로 우선 가동되도록 시도
+set +e
+bash "${BASE_DIR}/scripts/issue_lets_encrypt.sh"
+LE_STATUS=$?
+set -e
+if [[ "${LE_STATUS}" -ne 0 ]]; then
+  echo "[WARN] Let's Encrypt issuance failed. Will continue with self-signed for now."
+fi
+
+# (3) 서비스 설치/재시작 — install_service가 LE 우선/없으면 self-signed 사용
 bash "${BASE_DIR}/scripts/install_service.sh"
 
-# --- Health check (max 10s, every 1s, OK면 즉시 종료 + 응답 출력) ---
-echo "[CHECK] waiting for service to become healthy (max 10s)..."
+# (4) 헬스체크(최대 10초)
+echo "[CHECK] waiting for health (max 10s)"
 ok=0
-for i in {1..10}; do
+resp=""
+for i in $(seq 1 10); do
   resp="$(curl -sk --max-time 1 https://127.0.0.1/healthz || true)"
-  if echo "$resp" | grep -q '"ok"\s*:\s*true'; then
-    echo "Health OK on attempt $i -> $resp"
-    ok=1
-    break
+  if echo "$resp" | grep -q '"ok"[[:space:]]*:[[:space:]]*true'; then
+    echo "Health OK at try $i -> $resp"
+    ok=1; break
   fi
-  if sudo ss -ltnp | grep -q ':443'; then
-    echo "443 is listening, retrying health... (attempt $i)"
+  if ss -ltnp | grep -q ':443'; then
+    echo "443 listening, retry... ($i)"
   else
-    echo "443 not listening yet (attempt $i)"
+    echo "443 not listening yet ($i)"
   fi
   sleep 1
 done
 
-# venv 경로 안내 (APP_DST가 없으면 기본값 사용)
-VENV_ACT="${APP_DST:-/home/ubuntu/sentinel}/.venv/bin/activate"
-
-if [ "$ok" -ne 1 ]; then
-  echo "Health not ready after 10s"
+VENV_ACT="${APP_DST}/.venv/bin/activate"
+if [[ "$ok" -ne 1 ]]; then
+  echo "[ERR] Health not ready after 10s"
   echo "Last response: ${resp:-<no response>}"
-  journalctl -u sentinel -n 20 --no-pager || true
+  journalctl -u sentinel -n 50 --no-pager || true
 else
   echo
-  echo "[Guide] Activation of virtual environment:"
-  echo "source $VENV_ACT"
-  echo "(deactivate: deactivate)"
-  echo "[Guide] Server Monitoring:"
-  echo "sudo journalctl -u sentinel -n 100 -f"
+  echo "[Guide] venv: source ${VENV_ACT}"
+  echo "[Guide] log : journalctl -u sentinel -n 100 -f"
 fi
 
-echo "[DONE] Deployment finished."
-echo "Service:    systemctl status sentinel"
-echo "Health:     curl -k https://${SERVER_IP:-<YOUR_IP>}/healthz"
+echo "[DONE] Deploy finished."
+echo "Service:   systemctl status sentinel"
+echo "Dashboard: curl -I https://${DOMAIN}/dashboard/"
+echo "Cert info: echo | openssl s_client -connect ${DOMAIN}:443 -servername ${DOMAIN} 2>/dev/null | openssl x509 -noout -issuer -subject -dates"

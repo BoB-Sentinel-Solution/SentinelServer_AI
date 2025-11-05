@@ -11,7 +11,7 @@ cd SentinelServer_AI
 cp setup/.env.example setup/.env
 nano setup/.env   # SERVER_IP, APP_DST, RUN_USER 필요 시 수정
 
-# 3) 한 번에 배포
+# 3) 한 번에 배포(서비스/코드/venv/DB/인증서)
 bash setup/scripts/deploy.sh
  ```
 

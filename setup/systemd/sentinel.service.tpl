@@ -12,13 +12,16 @@ EnvironmentFile=${APP_DST}/setup/.env
 Environment=PATH=${APP_DST}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
 
-# HF/Transformers 캐시(쓰기 경로를 OS 표준 위치로)
+# HF/Transformers 캐시
 Environment=TRANSFORMERS_CACHE=/var/cache/sentinel/hf
 Environment=HF_HUB_OFFLINE=1
 Environment=TRANSFORMERS_OFFLINE=1
 Environment=TOKENIZERS_PARALLELISM=false
 
-# 실행 전 디렉터리 보장
+# >>> systemd가 /var/cache/sentinel을 선제 생성
+CacheDirectory=sentinel
+CacheDirectoryMode=0755
+# (선택) 하위 hf 디렉토리는 ExecStartPre로 생성해도 되고 런타임에 생성돼도 OK
 ExecStartPre=/usr/bin/mkdir -p /var/cache/sentinel/hf
 ExecStartPre=/usr/bin/chown -R ${RUN_USER}:${RUN_GROUP} /var/cache/sentinel
 
@@ -27,7 +30,7 @@ ExecStartPre=/usr/bin/test -x ${APP_DST}/.venv/bin/python3
 ExecStartPre=/usr/bin/test -r ${CERT_FULLCHAIN}
 ExecStartPre=/usr/bin/test -r ${CERT_PRIVKEY}
 
-# uvicorn 실행(기존)
+# uvicorn HTTPS
 ExecStart=${APP_DST}/.venv/bin/python3 -m uvicorn app:app --host 0.0.0.0 --port 443 \
   --ssl-certfile ${CERT_FULLCHAIN} \
   --ssl-keyfile  ${CERT_PRIVKEY}
@@ -38,8 +41,6 @@ NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=read-only
 PrivateTmp=true
-
-# 쓰기 허용 경로는 '존재하는 상위'로 잡기
 ReadWritePaths=${APP_DST}
 ReadWritePaths=/var/cache/sentinel
 

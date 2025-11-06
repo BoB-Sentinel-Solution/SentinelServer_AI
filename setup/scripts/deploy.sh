@@ -33,18 +33,45 @@ apt-get install -y python3-venv python3-pip rsync curl openssl certbot gettext-b
 [[ -x "${BASE_DIR}/scripts/setup_timezone.sh" ]]  && bash "${BASE_DIR}/scripts/setup_timezone.sh"  || timedatectl set-timezone "${TZ_NAME}" || true
 [[ -x "${BASE_DIR}/scripts/setup_firewall.sh" ]] && bash "${BASE_DIR}/scripts/setup_firewall.sh" || { command -v ufw >/dev/null 2>&1 && ufw allow 80,443/tcp || true; }
 
-# 앱 동기화 + venv (기존 로직 유지)
+# 앱 동기화 + venv (기존 로직 유지)  ---[교체본 시작]---
 if [[ -x "${BASE_DIR}/scripts/sync_app.sh" ]]; then
   bash "${BASE_DIR}/scripts/sync_app.sh"
 else
   echo "[APP] sync to ${APP_DST}"
   mkdir -p "${APP_DST}"
   rsync -av --delete --exclude ".git" --exclude "__pycache__" --exclude ".venv" "${REPO_ROOT}/" "${APP_DST}/"
+
   cd "${APP_DST}"
   python3 -m venv .venv
   source .venv/bin/activate
-  pip install --upgrade pip
-  [[ -f requirements.txt ]] && pip install -r requirements.txt
+  python -m pip install -U pip setuptools wheel
+
+  # ----- PyTorch 설치 정책 -----
+  # 기본값(CUDA 12.1). 필요 시 환경변수로 오버라이드 가능.
+  : "${TORCH_VERSION:=2.4.1}"
+  : "${VISION_VERSION:=0.19.1}"
+  : "${AUDIO_VERSION:=2.4.1}"
+  : "${TORCH_CHANNEL:=cu121}"   # cpu | cu121 등
+
+  if command -v nvidia-smi >/dev/null 2>&1 && [[ "${TORCH_CHANNEL}" != "cpu" ]]; then
+    echo "[PYTORCH] installing CUDA ${TORCH_CHANNEL} wheels..."
+    pip install --index-url "https://download.pytorch.org/whl/${TORCH_CHANNEL}" \
+      "torch==${TORCH_VERSION}" "torchvision==${VISION_VERSION}" "torchaudio==${AUDIO_VERSION}"
+  else
+    echo "[PYTORCH] installing CPU wheels..."
+    pip install --index-url "https://download.pytorch.org/whl/cpu" \
+      "torch==${TORCH_VERSION}" "torchvision==${VISION_VERSION}" "torchaudio==${AUDIO_VERSION}"
+  fi
+
+  # ----- requirements.txt에서 토치 계열은 제외 설치 -----
+  if [[ -f requirements.txt ]]; then
+    echo "[PIP] installing app requirements (torch/vision/audio 제외)"
+    # requirements.txt에서 torch/vision/audio/triton/nvidia-* 라인 제거 후 설치
+    grep -Ev '^(torch|torchvision|torchaudio|triton|nvidia-).*' requirements.txt > /tmp/req.clean.txt || true
+    pip install -r /tmp/req.clean.txt
+    rm -f /tmp/req.clean.txt
+  fi
+
   deactivate
 fi
 

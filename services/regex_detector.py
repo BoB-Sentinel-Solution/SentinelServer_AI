@@ -48,26 +48,35 @@ def _pick_email_group(m) -> Tuple[str, int, int]:
     return v0, b0, e0
 
 def detect_entities(text: str) -> List[Dict[str, Any]]:
-    """
-    반환: [{label, value, begin, end}, ...]
-    - CARD_NUMBER/IMEI는 Luhn 검증 통과만 채택
-    - EMAIL은 그룹(1|2)의 value/span 사용(꺾쇠 제외)
-    - 겹치는 스팬은 긴 매치 우선으로 정리
-    """
     if not text:
         return []
 
-    found: List[Tuple[int, int, str, str]] = []  # (begin, end, label, value)
+    found: List[Tuple[int, int, str, str]] = []  # (b, e, label, value)
 
     for label, rx in PATTERNS.items():
         for m in rx.finditer(text):
+            # ===== EMAIL만 캡처 그룹으로 값/오프셋 산출 =====
             if label == "EMAIL":
-                val, b, e = _pick_email_group(m)
+                email_val = None
+                gi = None
+                # (1) 첫 번째/두 번째 캡처 그룹 중 실제 이메일이 들어있는 쪽 선택
+                for i, g in enumerate(m.groups(), start=1):
+                    if g:
+                        email_val = g
+                        gi = i
+                        break
+                if email_val is not None:
+                    b, e = m.start(gi), m.end(gi)
+                    val = email_val
+                else:
+                    # 폴백(이상 상황): 전체 스팬
+                    b, e = m.span()
+                    val = m.group(0)
             else:
                 b, e = m.span()
                 val = m.group(0)
 
-            # 루한 검증(해당 라벨만)
+            # ===== 선택적 후검증(루한) =====
             if label == "CARD_NUMBER" and not _is_card_pan(val):
                 continue
             if label == "IMEI" and not _is_imei(val):
@@ -77,6 +86,18 @@ def detect_entities(text: str) -> List[Dict[str, Any]]:
 
     if not found:
         return []
+
+    # 겹침 정리(긴 스팬 우선)
+    found.sort(key=lambda x: (x[0], -(x[1] - x[0])))
+    selected: List[Tuple[int, int, str, str]] = []
+    taken: List[Tuple[int, int]] = []
+    for b, e, lab, val in found:
+        if any(not (e <= tb or te <= b) for tb, te in taken):
+            continue
+        taken.append((b, e))
+        selected.append((b, e, lab, val))
+
+    return [{"label": lab, "value": val, "begin": b, "end": e} for b, e, lab, val in selected]
 
     # 겹침 정리 — 시작 오름차순, 길이 내림차순 정렬 후 non-overlap 선택
     found.sort(key=lambda x: (x[0], -(x[1] - x[0])))

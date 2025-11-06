@@ -4,10 +4,8 @@
   <meta charset="utf-8" />
   <title>Sentinel Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- reset: 로컬 파일 사용 (CDN 금지) -->
-  <link rel="stylesheet" href="/dashboard/vendor/reset.min.css">
-
+  <!-- reset: jsdelivr 허용이라 그대로 사용 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset/dist/reset.min.css">
   <style>
     :root{
       --bg:#0b1020; --card:#121a36; --border:#1f2a4a; --text:#eef1f6; --muted:#a9b3c9;
@@ -43,9 +41,8 @@
       .kpi .num{font-size:32px}
     }
   </style>
-
-  <!-- Chart.js(로컬) -->
-  <script src="/dashboard/vendor/chart.umd.min.js"></script>
+  <!-- 차트: CDN 그대로/또는 로컬 vendor로 교체 가능 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -127,7 +124,7 @@
     </section>
   </div>
 
-  <!-- 앱 스크립트(로컬) -->
-  <script src="/dashboard/app.js"></script>
+  <!-- 개발 중 CDN 유지. 운영에선 로컬: /dashboard/static/vendor/chart.umd.min.js -->
+  <script src="/dashboard/static/app.js"></script>
 </body>
 </html>

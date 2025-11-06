@@ -1,6 +1,7 @@
 # services/regex_rules.py
 from __future__ import annotations
 import re
+from typing import Callable, Iterator, Match
 
 # ===== 기본 플래그 =====
 X = re.VERBOSE
@@ -8,6 +9,9 @@ I = re.IGNORECASE
 M = re.MULTILINE
 S = re.DOTALL
 
+# ---------------------------
+# 정규식 패턴
+# ---------------------------
 PATTERNS = {
     # PHONE (전화번호)
     "PHONE": re.compile(r"""
@@ -32,8 +36,9 @@ PATTERNS = {
 (?!\d)
 """, X),
 
-"EMAIL": re.compile(r"""
-(?<=^|[\s<\(\["':.,;!?=]|[가-힣])
+    # EMAIL — Python 호환(가변폭 lookbehind 제거), 경계 소비 방식
+    "EMAIL": re.compile(r"""
+(?:^|[\s<\(\["':.,;!?=]|[가-힣])     # 앞 경계(소비)
 (?:
   # 1) "표시명" + <이메일>
   (?:"[^"\r\n]*"\s*)?<
@@ -52,7 +57,7 @@ PATTERNS = {
     [A-Za-z]{2,63}
   )
 )
-(?=$|[\s>\)\]"':.,;!?=]|[가-힣])
+(?=$|[\s>\)\]"':.,;!?=]|[가-힣])      # 뒤 경계(lookahead)
 """, re.X | re.I),
 
     # PERSONAL_CUSTOMS_ID (개인통관고유부호)
@@ -126,7 +131,7 @@ PATTERNS = {
 (?![0-9A-Za-z])
 """, X | I),
 
-"PRIVATE_KEY": re.compile(r"""
+    "PRIVATE_KEY": re.compile(r"""
 ^-----BEGIN OPENSSH PRIVATE KEY-----\r?\n[A-Za-z0-9+/=\r\n]+^-----END OPENSSH PRIVATE KEY-----$
 |
 ^-----BEGIN (?:RSA|EC|DSA) PRIVATE KEY-----\r?\n(?:[A-Za-z0-9+/=\r\n]+)^-----END (?:RSA|EC|DSA) PRIVATE KEY-----$
@@ -143,7 +148,7 @@ PATTERNS = {
     "IMEI": re.compile(r"(?x)(?<!\d)(?:\d[ -]?){15}(?!\d)"),
 
     # CARD_EXPIRY (선택)
-    "CARD_EXPIRY": re.compile(r"(?x)(?<!\d)(0[1-9]|1[0-2])\s*[\/\-]\s*(?:\d{2}|\d{4})(?!\d)"),
+    "CARD_EXPIRY": re.compile(r"(?x)(0[1-9]|1[0-2])\s*[\/\-]\s*(?:\d{2}|\d{4})"),
 
     # BANK_ACCOUNT (국내 예시들 – 포맷 다양, 과탐 가능)
     "BANK_ACCOUNT": re.compile(r"""
@@ -217,6 +222,7 @@ PATTERNS = {
 (?!\d)
 """, X),
 
+    # IPV6 (대괄호/비대괄호, zone-id, CIDR, 포트)
     "IPV6": re.compile(r"""
 (
   \[
@@ -247,8 +253,7 @@ PATTERNS = {
     (?:[A-Fa-f0-9]{1,4}:){1,6}:[A-Fa-f0-9]{1,4}|
     (?:[A-Fa-f0-9]{1,4}:){1,5}(?::[A-Fa-f0-9]{1,4}){1,2}|
     (?:[A-Fa-f0-9]{1,4}:){1,4}(?::[A-Fa-f0-9]{1,4}){1,3}|
-    (?:[A-Fa-f0-9]{1,4}:){1,3}(?::[A-Fa-f0-9]{1,4}){1,4}|
-    (?:[A-Fa-f0-9]{1,4}:){1,2}(?::[A-Fa-f0-9]{1,4}){1,5}|
+    (?:[A-Fa-f0-9]{1,3}[A-Fa-f0-9]?:){1,2}(?::[A-Fa-f0-9]{1,4}){1,5}|  # relax 한변
     [A-Fa-f0-9]{1,4}:(?:(?::[A-Fa-f0-9]{1,4}){1,6})|
     :(?:(?::[A-Fa-f0-9]{1,4}){1,7}|:)|
     (?:[A-Fa-f0-9]{1,4}:){1,4}
@@ -260,6 +265,6 @@ PATTERNS = {
 )
 """, X | M | S),
 
-    # MAC_ADDRESS
-    "MAC_ADDRESS": re.compile(r"(?xi)(?=[0-9A-F]{2}([-:]))[0-9A-F]{2}(?:\1[0-9A-F]{2}){5}(?=.*[A-F])"),
+    # MAC_ADDRESS — (수정) 대문자 포함 검증 lookahead 제거
+    "MAC_ADDRESS": re.compile(r"(?xi)(?=[0-9A-F]{2}([-:]))[0-9A-F]{2}(?:\1[0-9A-F]{2}){5}"),
 }

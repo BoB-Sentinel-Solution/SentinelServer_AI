@@ -53,7 +53,7 @@ TOKEN: Dict[str, str] = {
     "MAC_ADDRESS": "MAC_ADDRESS",
     "IMEI": "IMEI",
 
-    # 구버전에서 쓰던 이름들(호환)
+    # 구버전 호환
     "ORDER_ID": "ORDER_ID",
     "PASSWORD": "PASSWORD",
     "USERNAME": "USERNAME",
@@ -74,8 +74,11 @@ def _collect_ranges_by_offset(original: str, entities: List[Entity]) -> List[Tup
     ranges: List[Tuple[int, int, str]] = []
     for e in entities:
         if hasattr(e, "begin") and hasattr(e, "end"):
-            b = int(getattr(e, "begin"))
-            en = int(getattr(e, "end"))
+            try:
+                b = int(getattr(e, "begin"))
+                en = int(getattr(e, "end"))
+            except Exception:
+                continue
             if 0 <= b < en <= len(original):
                 ranges.append((b, en, _token_for(_norm_label(e))))
     return ranges
@@ -104,43 +107,52 @@ def _merge_and_sort(ranges: List[Tuple[int, int, str]]) -> List[Tuple[int, int, 
     """겹치는 구간 최소화(겹치면 더 긴 구간 우선), 이후 뒤에서 앞으로 치환할 수 있게 정렬"""
     if not ranges:
         return []
-    # 먼저 시작, 길이(내림차순) 기준으로 정렬해서 긴 구간을 우선 채택
+    # 시작 오름차순, 길이 내림차순으로 정렬 후 non-overlap 선택
     ranges = sorted(ranges, key=lambda x: (x[0], -(x[1] - x[0])))
     merged: List[Tuple[int, int, str]] = []
-    taken = []  # (b,en)
+    taken: List[Tuple[int, int]] = []
     for b, en, tok in ranges:
-        overlap = False
-        for tb, ten in taken:
-            if not (en <= tb or ten <= b):  # 겹침
-                overlap = True
-                break
-        if not overlap:
-            taken.append((b, en))
-            merged.append((b, en, tok))
+        overlap = any(not (en <= tb or te <= b) for tb, te in taken)
+        if overlap:
+            continue
+        taken.append((b, en))
+        merged.append((b, en, tok))
     # 실제 치환은 뒤에서 앞으로
     merged.sort(key=lambda x: x[0], reverse=True)
     return merged
 
-def mask_by_entities(original: str, entities: List[Entity]) -> str:
+def _apply_ranges(original: str, ranges: List[Tuple[int, int, str]], parens: bool) -> str:
+    s = original
+    for b, en, tok in ranges:
+        rep = f"({tok})" if parens else tok
+        s = s[:b] + rep + s[en:]
+    return s
+
+def _prepare_ranges(original: str, entities: List[Entity]) -> List[Tuple[int, int, str]]:
+    """오프셋 우선, 값 기반을 보강으로 합쳐 겹침 정리까지 완료"""
     if not original or not entities:
-        return original
-
-    # 1) 오프셋 기반 수집
+        return []
     ranges = _collect_ranges_by_offset(original, entities)
-
-    # 2) 값 기반 수집(오프셋이 없을 때 또는 혼용 시 추가)
     if not ranges:
         ranges = _collect_ranges_by_value(original, entities)
     else:
-        # 혼용: 값 기반으로도 잡히는 게 있으면 합쳐서 겹침 정리
         ranges += _collect_ranges_by_value(original, entities)
+    return _merge_and_sort(ranges)
 
+def mask_by_entities(original: str, entities: List[Entity]) -> str:
+    """
+    엔티티를 토큰으로 치환 (괄호 없음).
+    """
+    ranges = _prepare_ranges(original, entities)
     if not ranges:
         return original
+    return _apply_ranges(original, ranges, parens=False)
 
-    ranges = _merge_and_sort(ranges)
-
-    s = original
-    for b, en, tok in ranges:
-        s = s[:b] + tok + s[en:]
-    return s
+def mask_with_parens_by_entities(original: str, entities: List[Entity]) -> str:
+    """
+    엔티티를 '(TOKEN)'으로 치환 (괄호 포함).
+    """
+    ranges = _prepare_ranges(original, entities)
+    if not ranges:
+        return original
+    return _apply_ranges(original, ranges, parens=True)

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from schemas import InItem, ServerOut, Entity
 from models import LogRecord
 from services.ocr import OcrService
-from services.masking import mask_by_entities
+from services.masking import mask_by_entities, mask_with_parens_by_entities
 from services.attachment import save_attachment_file
 from services.similarity import best_similarity_against_folder
 from repositories.log_repo import LogRepository
@@ -98,42 +98,42 @@ class DbLoggingService:
 
         # 3) 정규식 1차 감지 (원문 기준 스팬 확보)
         prompt_text = item.prompt or ""
-        regex_ents_prompt = []
         try:
-            regex_ents_prompt = regex_detect(prompt_text)  # [{label,value,begin,end}, ...]
+            regex_ents_prompt: List[Dict[str, Any]] = regex_detect(prompt_text)  # [{label,value,begin,end}, ...]
         except Exception:
             regex_ents_prompt = []
 
-        # 4) 1차 마스킹(정규식 결과 반영)
-        #   - Entity 스키마로 변환 후 치환
-        masked_after_regex = mask_by_entities(
+        # 4) AI 입력용 마스킹(정규식 결과로만 라벨링, 괄호 포함)
+        masked_for_ai = mask_with_parens_by_entities(
             prompt_text,
             [Entity(**e) for e in regex_ents_prompt if set(e).issuperset({"label","value","begin","end"})]
         )
 
-        # (선택) OCR 텍스트에도 정규식 적용 (DB 저장은 프롬프트만)
-        regex_ents_ocr: List[Dict[str, Any]] = []
+        # (선택) OCR 텍스트에도 정규식 적용 (민감도 판정에는 반영하지만, 표시/저장은 프롬프트만)
         if ocr_used and ocr_text:
             try:
                 regex_ents_ocr = regex_detect(ocr_text)
             except Exception:
                 regex_ents_ocr = []
+        else:
+            regex_ents_ocr = []
 
-        # 5) AI 보완 탐지 (마스킹된 프롬프트 대상)
-        #    - offline_sensitive_detector_min.py 의 JSON 출력: {"has_sensitive": bool, "entities":[{"type","value"}]}
+        # 5) AI 보완 탐지 — 힌트 라벨 없이, 마스킹된 프롬프트만 전달
+        #    기대 출력: {"has_sensitive": bool, "entities":[{"type","value"}], "processing_ms": <int?>}
         try:
-            det_ai = _DETECTOR.analyze_text(masked_after_regex, return_spans=False)
+            det_ai = _DETECTOR.analyze_text(masked_for_ai, return_spans=False)
         except Exception:
-            det_ai = {"has_sensitive": False, "entities": []}
+            det_ai = {"has_sensitive": False, "entities": [], "processing_ms": 0}
 
         ai_raw_ents = det_ai.get("entities", []) or []
+        ai_ms = int(det_ai.get("processing_ms", 0) or 0)
 
         # 6) AI 결과를 원문 기준 스팬으로 재계산 → 정규식 결과와 병합
         ai_ents_rebased = _rebase_ai_entities_on_original(prompt_text, ai_raw_ents)
         prompt_entities = _dedup_spans(regex_ents_prompt, ai_ents_rebased)
 
         # OCR에서 정규식으로 잡힌 것들도 민감도 판정에 반영(표시는 프롬프트만)
-        has_sensitive = bool(prompt_entities or regex_ents_ocr)
+        has_sensitive = bool(prompt_entities or regex_ents_ocr or bool(det_ai.get("has_sensitive")))
 
         # 7) 정책결정 (이미지 유사도 포함)
         file_blocked = False
@@ -156,14 +156,14 @@ class DbLoggingService:
             except Exception:
                 pass
 
-        # 8) 최종 마스킹(정규식 + AI 보완 엔티티 모두 반영)
+        # 8) 최종 마스킹(정규식 + AI 보완 엔티티 모두 반영, 괄호 없음)
         final_modified_prompt = mask_by_entities(
             prompt_text,
             [Entity(**e) for e in prompt_entities if set(e).issuperset({"label","value","begin","end"})]
         )
 
-        # 전체 처리시간
-        processing_ms = int((time.perf_counter() - t0) * 1000)
+        # 전체 처리시간 (AI 처리시간도 포함해 최소값 보정)
+        processing_ms = max(int((time.perf_counter() - t0) * 1000), ai_ms)
 
         # hostname 우선, 없으면 pc_name 대체 (schemas가 별칭 처리)
         host_name = item.hostname or item.pc_name

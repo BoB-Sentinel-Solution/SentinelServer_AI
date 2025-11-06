@@ -1,53 +1,61 @@
 # services/ai_detector.py
 # 오프라인 전용 AI 탐지기(모델 1회 로드 → 재사용)
 
+from __future__ import annotations
 import os, json, threading
-from typing import Dict, Any, List, Tuple
+from typing import Any, Dict, List
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-# 오프라인 강제
+# 오프라인 강제 (v5부터는 HF_HOME 권장이지만, 유닛에 이미 OFFLINE 변수 설정됨)
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 SYS_PROMPT = """
-    You are a strict whitelist-only detector for sensitive entities.
+You are a strict whitelist-only detector for sensitive entities.
 
-    Return ONLY a compact JSON with these keys:
-    - has_sensitive: true or false
-    - entities: list of {"type": <LABEL>, "value": <exact substring>}
+Return ONLY a compact JSON with these keys:
+- has_sensitive: true or false
+- entities: list of {"type": <LABEL>, "value": <exact substring>}
 
-    HARD RULES
-    - Allowed labels ONLY (uppercase, exact match). If a label is not in the list below, DO NOT invent or output it.
-    - If the text contains none of the allowed entities: return exactly {"has_sensitive": false, "entities": []}.
-    - `value` must be the exact substring from the user text (no masking, no redaction, no normalization).
-    - Output JSON only — no explanations, no extra text, no code fences, no trailing commas.
-    - The JSON must be valid and parseable.
+HARD RULES
+- Allowed labels ONLY (uppercase, exact match). If a label is not in the list below, DO NOT invent or output it.
+- If the text contains none of the allowed entities: return exactly {"has_sensitive": false, "entities": []}.
+- `value` must be the exact substring from the user text (no masking, no normalization).
+- Output JSON only — no explanations, no extra text, no code fences.
 
-    ALLOWED LABELS
-    # 1) Basic Identity Information
-    NAME, PHONE, EMAIL, ADDRESS, POSTAL_CODE,
-  
-    # 2) Public Identification Number
-    PERSONAL_CUSTOMS_ID, RESIDENT_ID, PASSPORT, DRIVER_LICENSE, FOREIGNER_ID, HEALTH_INSURANCE_ID, BUSINESS_ID, MILITARY_ID,
+ALLOWED LABELS
+# 1) Basic Identity Information
+NAME, PHONE, EMAIL, ADDRESS, POSTAL_CODE,
 
-    # 3) Authentication Information
-    JWT, API_KEY, GITHUB_PAT, PRIVATE_KEY,
+# 2) Public Identification Number
+PERSONAL_CUSTOMS_ID, RESIDENT_ID, PASSPORT, DRIVER_LICENSE, FOREIGNER_ID, HEALTH_INSURANCE_ID, BUSINESS_ID, MILITARY_ID,
 
-    # 4) Finanacial Information
-    CARD_NUMBER, CARD_EXPIRY, BANK_ACCOUNT, CARD_CVV, PAYMENT_PIN, MOBILE_PAYMENT_PIN,
+# 3) Authentication Information
+JWT, API_KEY, GITHUB_PAT, PRIVATE_KEY,
 
-    # 5) Cryptocurrency Information
-    MNEMONIC, CRYPTO_PRIVATE_KEY, HD_WALLET, PAYMENT_URI_QR, 
+# 4) Financial Information
+CARD_NUMBER, CARD_EXPIRY, BANK_ACCOUNT, CARD_CVV, PAYMENT_PIN, MOBILE_PAYMENT_PIN,
 
-    # 6) Network Information + etc
-    IPV4, IPV6, MAC_ADDRESS, IMEI
+# 5) Cryptocurrency Information
+MNEMONIC, CRYPTO_PRIVATE_KEY, HD_WALLET, PAYMENT_URI_QR,
+
+# 6) Network Information + etc
+IPV4, IPV6, MAC_ADDRESS, IMEI
 """.strip()
 
+_ALLOWED = {
+    "NAME","PHONE","EMAIL","ADDRESS","POSTAL_CODE",
+    "PERSONAL_CUSTOMS_ID","RESIDENT_ID","PASSPORT","DRIVER_LICENSE","FOREIGNER_ID","HEALTH_INSURANCE_ID","BUSINESS_ID","MILITARY_ID",
+    "JWT","API_KEY","GITHUB_PAT","PRIVATE_KEY",
+    "CARD_NUMBER","CARD_EXPIRY","BANK_ACCOUNT","CARD_CVV","PAYMENT_PIN","MOBILE_PAYMENT_PIN",
+    "MNEMONIC","CRYPTO_PRIVATE_KEY","HD_WALLET","PAYMENT_URI_QR",
+    "IPV4","IPV6","MAC_ADDRESS","IMEI",
+}
 
 def _extract_json(s: str) -> Dict[str, Any]:
-    # 아주 간단한 마지막 { ... } 블록 복구
+    """모델 출력의 마지막 JSON 오브젝트만 안전 추출."""
     end = s.rfind("}")
     if end == -1:
         return {"has_sensitive": False, "entities": []}
@@ -83,6 +91,34 @@ def _extract_json(s: str) -> Dict[str, Any]:
     except Exception:
         return {"has_sensitive": False, "entities": []}
 
+def _norm_entities(text: str, ents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """LLM 결과의 엔티티를 서버 스키마에 맞게 정규화:
+       - 'type' → 'label'
+       - begin/end 미제공 시 value의 최초 매칭 위치로 복구
+       - 허용 라벨 화이트리스트 적용
+    """
+    if not isinstance(text, str):
+        text = "" if text is None else str(text)
+    out: List[Dict[str, Any]] = []
+    for e in ents or []:
+        label = (e.get("label") or e.get("type") or "").strip().upper()
+        if label not in _ALLOWED:
+            continue
+        value = e.get("value")
+        if not isinstance(value, str) or not value:
+            continue
+        begin = e.get("begin")
+        end = e.get("end")
+        if not (isinstance(begin, int) and isinstance(end, int) and 0 <= begin < end <= len(text)):
+            idx = text.find(value)
+            if idx == -1:
+                # LLM이 공백/마스킹 등 변형으로 value를 다르게 낸 경우 — 위치 복구 불가 → 스킵
+                continue
+            begin, end = idx, idx + len(value)
+        # value는 원문 슬라이스로 보정
+        value = text[begin:end]
+        out.append({"value": value, "begin": begin, "end": end, "label": label})
+    return out
 
 class _Detector:
     def __init__(self, model_dir: str, max_new_tokens: int = 256):
@@ -91,9 +127,14 @@ class _Detector:
         self.tok = AutoTokenizer.from_pretrained(
             model_dir, use_fast=True, local_files_only=True, trust_remote_code=True
         )
+        # accelerate 설치되어 있으므로 device_map="auto" 사용 가능
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_dir, device_map="auto", torch_dtype="auto",
-            local_files_only=True, trust_remote_code=True
+            model_dir,
+            device_map="auto",
+            torch_dtype="auto",
+            local_files_only=True,
+            trust_remote_code=True,
+            low_cpu_mem_usage=True,
         )
         if self.tok.pad_token is None:
             self.tok.pad_token = self.tok.eos_token
@@ -104,36 +145,28 @@ class _Detector:
             {"role": "system", "content": SYS_PROMPT},
             {"role": "user", "content": text or ""},
         ]
-        with self.lock:
+        with self.lock, torch.no_grad():
             inputs = self.tok.apply_chat_template(
                 messages, return_tensors="pt", add_generation_prompt=True
             ).to(self.model.device)
-            with torch.no_grad():
-                out = self.model.generate(
-                    inputs=inputs,
-                    max_new_tokens=self.max_new_tokens,
-                    do_sample=False,
-                    eos_token_id=self.tok.eos_token_id,
-                )
+            out = self.model.generate(
+                inputs=inputs,
+                max_new_tokens=self.max_new_tokens,
+                do_sample=False,
+                eos_token_id=self.tok.eos_token_id,
+            )
             decoded = self.tok.decode(out[0], skip_special_tokens=True)
+
         parsed = _extract_json(decoded)
-        if not isinstance(parsed, dict) or \
-           "has_sensitive" not in parsed or "entities" not in parsed:
-            return {"has_sensitive": False, "entities": []}
-        # 방어: 라벨/값 타입만 보정
-        ents = []
-        try:
-            for e in parsed.get("entities", []):
-                t = str(e.get("type", "")).strip().upper()
-                v = str(e.get("value", "")).strip()
-                if t and v:
-                    ents.append({"type": t, "value": v})
-        except Exception:
-            ents = []
-        return {"has_sensitive": bool(parsed.get("has_sensitive", False)), "entities": ents}
+        ents = parsed.get("entities") if isinstance(parsed, dict) else []
+        ents = ents if isinstance(ents, list) else []
 
+        entities_norm = _norm_entities(text, ents)
+        has_sensitive = bool(parsed.get("has_sensitive")) or bool(entities_norm)
 
-# ---- 글로벌 싱글톤 핸들(스타트업에서 초기화)
+        return {"has_sensitive": has_sensitive, "entities": entities_norm}
+
+# ---- 글로벌 싱글톤 (부팅시 1회 초기화)
 _detector_singleton: _Detector | None = None
 
 def init_from_env() -> None:

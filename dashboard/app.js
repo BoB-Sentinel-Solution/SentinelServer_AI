@@ -1,7 +1,9 @@
-async function fetchSummary() {
-  const res = await fetch('/dashboard/api/summary');
-  if (!res.ok) throw new Error('failed to load summary');
-  return await res.json();
+const API_BASE = '/api/summary';
+
+async function fetchJSON(url){
+  const r = await fetch(url, { headers: { 'Accept':'application/json' }});
+  if(!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
 }
 
 function toLabelsValues(obj) {

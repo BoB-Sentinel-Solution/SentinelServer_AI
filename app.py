@@ -66,16 +66,13 @@ async def security_headers(req: Request, call_next):
     # 최소 리퍼러
     resp.headers.setdefault("Referrer-Policy", "no-referrer")
 
-    # CSP: 동일 오리진 + (필요시 CDN 허용). 대시보드가 CDN을 쓴다면 주석 해제.
-    cdn = " https://cdn.jsdelivr.net"
-    # cdn = ""  # CDN 미사용 기본
     resp.headers.setdefault(
         "Content-Security-Policy",
         "default-src 'self'; "
-        f"script-src 'self'{cdn}; "
-        f"style-src 'self' 'unsafe-inline'{cdn}; "
+        "script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "  # ← inline style 허용(임시)
         "img-src 'self' data:; "
-        f"connect-src 'self'{cdn}; "   # 대시보드에서 동일 오리진 API 호출
+        "connect-src 'self' https://cdn.jsdelivr.net; "                # ← jsdelivr sourcemap 허용
         "frame-ancestors 'none'"
     )
 

@@ -11,6 +11,10 @@ from typing import Any, Dict, List
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
+# --- 토글: 내부 엔진 사용 여부 (기본 끔) ---------------------------------------
+# 외부 실행기(ai_external.py) 경로가 기본이며, 내부 엔진은 필요 시에만 켭니다.
+USE_INTERNAL = os.getenv("USE_INTERNAL_DETECTOR", "0") == "1"
+
 # --- 오프라인/캐시 환경 강제(유닛에서도 설정하지만 여기서도 기본값 보강) ---
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
@@ -143,6 +147,7 @@ class _Detector:
                     max_new_tokens=self.max_new_tokens,
                     do_sample=False,
                     eos_token_id=self.tok.eos_token_id,
+                    pad_token_id=self.tok.eos_token_id,
                 )
 
                 decoded = self.tok.decode(out[0], skip_special_tokens=True)
@@ -186,12 +191,17 @@ _detector_singleton: _Detector | None = None
 def init_from_env() -> None:
     """
     환경변수:
-      - MODEL_DIR: 로컬 모델 디렉터리 (필수)
+      - USE_INTERNAL_DETECTOR: "1"이면 내부 엔진 활성화(기본 0=비활성)
+      - MODEL_DIR: 로컬 모델 디렉터리 (필수; 내부 엔진 켰을 때)
       - MAX_NEW_TOKENS: 생성 토큰 수 (기본 256)
     """
     global _detector_singleton
     if _detector_singleton is not None:
         return
+
+    if not USE_INTERNAL:
+        # 내부 엔진은 기본 비활성. 의도적으로 켤 때만 로드.
+        raise RuntimeError("Internal detector disabled (set USE_INTERNAL_DETECTOR=1 to enable)")
 
     model_dir = os.getenv("MODEL_DIR", "").strip()
     if not model_dir:
@@ -203,6 +213,7 @@ def init_from_env() -> None:
 def analyze_text(text: str) -> Dict[str, Any]:
     """
     외부에서 호출하는 진입점.
+    내부 엔진이 비활성화면 RuntimeError를 명확히 던져 호출자가 폴백 경로(외부 실행기)를 타도록 유도.
     """
     if _detector_singleton is None:
         init_from_env()

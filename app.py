@@ -2,7 +2,6 @@
 from __future__ import annotations
 import os
 from pathlib import Path
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
@@ -10,27 +9,13 @@ from fastapi.staticfiles import StaticFiles
 from routers.logs import router as logs_router
 from routers.dashboard_api import router as dashboard_router
 
-# (AI) 서버 부팅 시 모델 선로딩
-from services.ai_detector import init_from_env
-
 BASE_DIR = Path(__file__).resolve().parent
 DASHBOARD_DIR = BASE_DIR / "dashboard"  # index.html, app.js, vendor/*
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # USE_AI_DETECTOR=true 면 GPU 모델 선로딩 (실패해도 서버는 뜸)
-    if os.getenv("USE_AI_DETECTOR", "true").lower() in ("1", "true", "yes"):
-        try:
-            init_from_env()
-            print("[INFO] AI detector initialized from env.")
-        except Exception as e:
-            print(f"[WARN] AI detector init failed: {e!r}")
-    yield
-
+# 선로딩 제거: 서버 시작 시 모델을 올리지 않음 (요청 시 외부 판별기 호출)
 app = FastAPI(
     title="Sentinel Solution Server",
     version="2.2.0",
-    lifespan=lifespan,
 )
 
 # ---------- 정적/대시보드 (SPA) ----------
@@ -61,7 +46,7 @@ async def security_headers(req: Request, call_next):
         "script-src 'self' https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "img-src 'self' data:; "
-        "connect-src 'self'; "
+        "connect-src 'self' https://cdn.jsdelivr.net; "
         "frame-ancestors 'none'"
     )
     # 신뢰 인증서 안정화 후 HSTS 활성 권장:

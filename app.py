@@ -84,7 +84,7 @@ async def security_headers(req: Request, call_next):
         f"script-src 'self'{cdn}; "
         f"style-src 'self' 'unsafe-inline'{cdn}; "
         "img-src 'self' data:; "
-        "connect-src 'self'; "   # 대시보드에서 동일 오리진 API 호출
+        f"connect-src 'self'{cdn}; "   # 대시보드에서 동일 오리진 API 호출
         "frame-ancestors 'none'"
     )
 

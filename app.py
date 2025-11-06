@@ -76,8 +76,8 @@ async def security_headers(req: Request, call_next):
     resp.headers.setdefault("Referrer-Policy", "no-referrer")
 
     # CSP: 동일 오리진 + (필요시 CDN 허용). 대시보드가 CDN을 쓴다면 주석 해제.
-    # cdn = " https://cdn.jsdelivr.net"
-    cdn = ""  # CDN 미사용 기본
+    cdn = " https://cdn.jsdelivr.net"
+    # cdn = ""  # CDN 미사용 기본
     resp.headers.setdefault(
         "Content-Security-Policy",
         "default-src 'self'; "

@@ -233,7 +233,7 @@ def main():
         if not sys.stdin.isatty():
             samples = [line.strip() for line in sys.stdin if line.strip()]
         else:
-            # 입력이 전혀 없으면 안전 폴백 한 줄만 출력
+            # 입력이 전혀 없으면 안전 폴백 한 줄만 출력 
             print(json.dumps({"has_sensitive": False, "entities": []}, ensure_ascii=False))
             return
 

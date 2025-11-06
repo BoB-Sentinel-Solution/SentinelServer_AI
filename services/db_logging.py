@@ -69,6 +69,18 @@ def _dedup_spans(base: List[Dict[str, Any]], extra: List[Dict[str, Any]]) -> Lis
             out.append(e)
     return out
 
+def _pick_alert(det_ai: Dict[str, Any]) -> str:
+    """
+    로컬 AI가 반환한 근거 텍스트를 다양한 키에서 베스트-에포트로 추출.
+    없으면 빈 문자열.
+    """
+    if not isinstance(det_ai, dict):
+        return ""
+    for k in ("alert", "reason", "rationale", "explanation", "why", "basis", "evidence", "details", "notes"):
+        v = det_ai.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return ""
 
 class DbLoggingService:
     @staticmethod
@@ -119,7 +131,7 @@ class DbLoggingService:
             regex_ents_ocr = []
 
         # 5) AI 보완 탐지 — 힌트 라벨 없이, 마스킹된 프롬프트만 전달
-        #    기대 출력: {"has_sensitive": bool, "entities":[{"type","value"}], "processing_ms": <int?>}
+        #    기대 출력: {"has_sensitive": bool, "entities":[{"type","value"}], "processing_ms": <int?>, "reason": "<근거>"}
         try:
             det_ai = _DETECTOR.analyze_text(masked_for_ai, return_spans=False)
         except Exception:
@@ -127,6 +139,7 @@ class DbLoggingService:
 
         ai_raw_ents = det_ai.get("entities", []) or []
         ai_ms = int(det_ai.get("processing_ms", 0) or 0)
+        alert_text = _pick_alert(det_ai)
 
         # 6) AI 결과를 원문 기준 스팬으로 재계산 → 정규식 결과와 병합
         ai_ents_rebased = _rebase_ai_entities_on_original(prompt_text, ai_raw_ents)
@@ -191,7 +204,7 @@ class DbLoggingService:
         )
         LogRepository.create(db, rec)
 
-        # 10) 응답
+        # 10) 응답 (에이전트로 '근거' 전달)
         return ServerOut(
             request_id      = request_id,
             host            = rec.host,
@@ -205,4 +218,5 @@ class DbLoggingService:
             file_blocked    = rec.file_blocked,
             allow           = rec.allow,
             action          = rec.action,
+            alert           = alert_text,  # ← 추가: 근거 텍스트
         )

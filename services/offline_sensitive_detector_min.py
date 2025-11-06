@@ -31,10 +31,11 @@ SYS_PROMPT = (
     Return ONLY a compact JSON with these keys:
     - has_sensitive: true or false
     - entities: list of {"type": <LABEL>, "value": <exact substring>}
+    - reason: a single concise sentence (why these labels were chosen). If none, use "".
 
     HARD RULES
     - Allowed labels ONLY (uppercase, exact match). If a label is not in the list below, DO NOT invent or output it.
-    - If the text contains none of the allowed entities: return exactly {"has_sensitive": false, "entities": []}.
+    - If the text contains none of the allowed entities: return exactly {"has_sensitive": false, "entities": [], "reason": ""}.
     - `value` must be the exact substring from the user text (no masking, no redaction, no normalization).
     - Output JSON only — no explanations, no extra text, no code fences, no trailing commas.
     - The JSON must be valid and parseable.

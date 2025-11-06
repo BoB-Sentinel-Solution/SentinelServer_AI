@@ -79,10 +79,12 @@ class ServerOut(BaseModel):
     host: str
     modified_prompt: str
     has_sensitive: bool
-    # 가변 기본값은 default_factory 사용
     entities: List[Entity] = Field(default_factory=list)
     processing_ms: int
 
     file_blocked: bool = False
     allow: bool = True
     action: str = "allow"
+
+    # 추가: 에이전트로 보내는 "근거" 텍스트
+    alert: str = ""  # 로컬 AI의 reason/설명 등을 넣어 전달

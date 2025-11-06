@@ -136,6 +136,16 @@ function renderCharts(summary) {
   );
 }
 
+/* ---------- XSS 안전한 테이블 렌더 ---------- */
+
+// 공통: 안전하게 텍스트 셀 추가
+function appendCell(tr, text) {
+  const td = document.createElement('td');
+  td.textContent = (text ?? '-') + ''; // 항상 문자열로
+  tr.appendChild(td);
+  return td;
+}
+
 function renderRecentLogs(summary) {
   const tb = $('#logs tbody');
   if (!tb) return;
@@ -144,23 +154,27 @@ function renderRecentLogs(summary) {
   const rows = Array.isArray(summary?.recent_logs) ? summary.recent_logs : [];
   for (const r of rows) {
     const tr = document.createElement('tr');
+
     const ents = Array.isArray(r.entities)
       ? r.entities.map(e => e?.label ?? e?.type ?? '').filter(Boolean).join(', ')
       : (r.entities || '');
 
-    const promptText = (r.prompt || '').toString().replaceAll('"', '&quot;');
+    appendCell(tr, r.time || '-');
+    appendCell(tr, r.host || '-');
+    appendCell(tr, r.hostname || '-');
+    appendCell(tr, r.public_ip || '-');
+    appendCell(tr, r.action || '-');
+    appendCell(tr, r.has_sensitive ? 'Y' : 'N');
+    appendCell(tr, r.file_blocked ? 'Y' : 'N');
+    appendCell(tr, ents || '-');
 
-    tr.innerHTML = `
-      <td>${r.time || '-'}</td>
-      <td>${r.host || '-'}</td>
-      <td>${r.hostname || '-'}</td>
-      <td>${r.public_ip || '-'}</td>
-      <td>${r.action || '-'}</td>
-      <td>${r.has_sensitive ? 'Y' : 'N'}</td>
-      <td>${r.file_blocked ? 'Y' : 'N'}</td>
-      <td>${ents || '-'}</td>
-      <td title="${promptText}">${r.prompt || ''}</td>
-    `;
+    // 프롬프트 셀: 본문/툴팁 모두 textContent 기반으로 안전하게
+    const promptTd = document.createElement('td');
+    const promptText = (r.prompt ?? '') + '';
+    promptTd.textContent = promptText;
+    promptTd.setAttribute('title', promptText);
+    tr.appendChild(promptTd);
+
     tb.appendChild(tr);
   }
 }

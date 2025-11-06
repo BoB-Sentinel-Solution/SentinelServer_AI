@@ -14,27 +14,16 @@ from services.attachment import save_attachment_file
 from services.similarity import best_similarity_against_folder
 from repositories.log_repo import LogRepository
 
-# 옵션 A: AI 감지 경로
-from services.detect import analyze_with_entities  # <- 중요: 이 함수를 사용
+from services.detect import analyze_with_entities  # 옵션 A
 
 ADMIN_IMAGE_DIR = Path("./SentinelServer_AI/adminset/image")
 SIMILARITY_THRESHOLD = 0.4  # 이미지 유사도 차단 임계
 
 class DbLoggingService:
-    """
-    파이프라인
-      1) 첨부 저장
-      2) (선택) OCR
-      3) AI 감지(프롬프트 / OCR 텍스트)
-      4) 정책결정(이미지 유사도 포함)
-      5) 마스킹(프롬프트 텍스트 대상)
-      6) DB 저장 → 응답
-    """
     @staticmethod
     def _serialize_attachment(att) -> Dict[str, Any] | None:
         if att is None:
             return None
-        # pydantic v1(.dict) / v2(.model_dump) 모두 대응
         if hasattr(att, "model_dump"):
             return att.model_dump()
         if hasattr(att, "dict"):
@@ -56,19 +45,26 @@ class DbLoggingService:
         # 2) OCR
         ocr_text, ocr_used, _ = OcrService.run_ocr(item)
 
-        # 3) AI 감지
+        # 3) AI 감지 (프롬프트 / OCR)
         prompt_text = item.prompt or ""
-        det_prompt = analyze_with_entities(prompt_text)             # {"has_sensitive", "entities", "processing_ms"}
-        prompt_entities = det_prompt.get("entities", [])            # [{value, begin, end, label}...]
+        try:
+            det_prompt = analyze_with_entities(prompt_text)
+        except Exception:
+            det_prompt = {"has_sensitive": False, "entities": [], "processing_ms": 0}
 
-        ocr_entities: List[Dict[str, Any]] = []
+        prompt_entities = det_prompt.get("entities", [])
         det_ocr_ms = 0
+        ocr_entities: List[Dict[str, Any]] = []
         if ocr_used and ocr_text:
-            det_ocr = analyze_with_entities(ocr_text)
-            ocr_entities = det_ocr.get("entities", [])
-            det_ocr_ms = int(det_ocr.get("processing_ms", 0))
+            try:
+                det_ocr = analyze_with_entities(ocr_text)
+                ocr_entities = det_ocr.get("entities", [])
+                det_ocr_ms = int(det_ocr.get("processing_ms", 0))
+            except Exception:
+                ocr_entities = []
+                det_ocr_ms = 0
 
-        has_sensitive = bool(det_prompt.get("has_sensitive") or (ocr_entities and len(ocr_entities) > 0))
+        has_sensitive = bool(det_prompt.get("has_sensitive") or ocr_entities)
         ai_ms = int(det_prompt.get("processing_ms", 0)) + det_ocr_ms
 
         # 4) 정책결정 (이미지 유사도 포함)
@@ -76,7 +72,6 @@ class DbLoggingService:
         allow = True
         action = "mask_and_allow" if prompt_entities else "allow"
 
-        # 이미지 첨부 + OCR 거의 무텍스트 ⇒ 유사도 검사
         if (
             saved_mime
             and saved_mime.startswith("image/")
@@ -91,19 +86,27 @@ class DbLoggingService:
                         allow = False
                         action = "block_upload_similar"
             except Exception:
-                # 유사도 검사 실패는 차단 사유로 보지 않음
                 pass
 
-        # 5) 마스킹(프롬프트 텍스트에만 적용)
-        modified_prompt = mask_by_entities(prompt_text, [Entity(**e) for e in prompt_entities])
+        # 5) 마스킹(프롬프트만)
+        # Entity 모델로 검증 후 마스킹에 전달
+        masked_entities = []
+        for e in prompt_entities:
+            try:
+                masked_entities.append(Entity(**e))
+            except Exception:
+                # 라벨/스팬 불완전시 스킵
+                pass
 
-        # 전체 처리시간(파이프라인) — AI ms 포함
+        modified_prompt = mask_by_entities(prompt_text, masked_entities)
+
+        # 전체 처리시간
         processing_ms = max(int((time.perf_counter() - t0) * 1000), ai_ms)
 
-        # 6) DB 저장
-        # hostname 우선, 없으면 pc_name/pcname으로 대체
-        host_name = item.hostname or getattr(item, "pc_name", None) or getattr(item, "pcname", None)
+        # hostname 우선, 없으면 pc_name/pcname 대체
+        host_name = item.hostname or getattr(item, "pc_name", None) or getattr(item, "PCName", None)
 
+        # 6) DB 저장
         rec = LogRecord(
             request_id      = request_id,
             time            = item.time,
@@ -117,7 +120,7 @@ class DbLoggingService:
 
             modified_prompt = modified_prompt,
             has_sensitive   = has_sensitive,
-            entities        = [dict(e) for e in prompt_entities],  # 프롬프트 기준 엔티티만 저장/표시
+            entities        = [dict(e) for e in prompt_entities],  # 프롬프트 엔티티만 저장/표시
             processing_ms   = processing_ms,
 
             file_blocked    = file_blocked,
@@ -132,7 +135,7 @@ class DbLoggingService:
             host            = rec.host,
             modified_prompt = rec.modified_prompt,
             has_sensitive   = rec.has_sensitive,
-            entities        = [Entity(**e) for e in rec.entities],
+            entities        = [Entity(**e) for e in rec.entities if set(e).issuperset({"value","begin","end","label"})],
             processing_ms   = rec.processing_ms,
             file_blocked    = rec.file_blocked,
             allow           = rec.allow,

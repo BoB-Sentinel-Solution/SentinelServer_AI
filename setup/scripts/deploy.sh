@@ -104,7 +104,7 @@ ok=0
 resp=""
 for i in $(seq 1 10); do
   # 우선 /api/healthz
-  resp="$(curl -sk --max-time 1 https://127.0.0.1/healthz || true)"
+  resp="$(curl -sk --max-time 1 https://127.0.0.1/api/healthz || true)"
   if echo "$resp" | grep -q '"ok"[[:space:]]*:[[:space:]]*true'; then
     echo "Health OK(/api/healthz) at try $i -> $resp"
     ok=1; break

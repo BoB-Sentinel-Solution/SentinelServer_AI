@@ -9,8 +9,8 @@
 
 사용 예시
 ---------
-python offline_sensitive_detector_min.py --model_dir runs/qwen7b_sft_merged --text "연락처 010-1234-5678"
-python offline_sensitive_detector_min.py --model_dir runs/qwen7b_sft_merged --input samples.txt --limit 0
+python offline_sensitive_detector_min.py --model_dir /root/runs/qwen3b_sft_merged --text "연락처 010-1234-5678"
+python offline_sensitive_detector_min.py --model_dir /root/runs/qwen3b_sft_merged --input samples.txt --limit 0
 """
 import os, sys, json, argparse, re
 from typing import Optional, Dict, Any, List
@@ -42,31 +42,34 @@ SYS_PROMPT = (
     ALLOWED LABELS
     # 1) Basic Identity Information
     NAME, PHONE, EMAIL, ADDRESS, POSTAL_CODE,
-  
+
     # 2) Public Identification Number
     PERSONAL_CUSTOMS_ID, RESIDENT_ID, PASSPORT, DRIVER_LICENSE, FOREIGNER_ID, HEALTH_INSURANCE_ID, BUSINESS_ID, MILITARY_ID,
 
     # 3) Authentication Information
     JWT, API_KEY, GITHUB_PAT, PRIVATE_KEY,
 
-    # 4) Finanacial Information
+    # 4) Financial Information
     CARD_NUMBER, CARD_EXPIRY, BANK_ACCOUNT, CARD_CVV, PAYMENT_PIN, MOBILE_PAYMENT_PIN,
 
     # 5) Cryptocurrency Information
-    MNEMONIC, CRYPTO_PRIVATE_KEY, HD_WALLET, PAYMENT_URI_QR, 
+    MNEMONIC, CRYPTO_PRIVATE_KEY, HD_WALLET, PAYMENT_URI_QR,
 
     # 6) Network Information + etc
     IPV4, IPV6, MAC_ADDRESS, IMEI
     """
-    )
+).strip()
 
 # --------- JSON 추출 유틸 ---------
 CODE_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
 
 def sanitize_text(s: str) -> str:
-    return (s.replace("\u2028", "\n")
-             .replace("\u2029", "\n")
-             .replace("\ufeff", "")).strip()
+    return (
+        s.replace("\u2028", "\n")
+         .replace("\u2029", "\n")
+         .replace("\ufeff", "")
+         .strip()
+    )
 
 def strip_role_headers_shallow(s: str) -> str:
     s = s.lstrip()
@@ -159,29 +162,37 @@ def extract_best_json(s: str) -> Optional[str]:
     return find_last_top_level_json_backward(s)
 
 # --------- 추론(한 샘플) ---------
+def build_prompt(user_text: str) -> str:
+    # chat_template 없이 순수 문자열 프롬프트 구성
+    # 모델이 JSON만 내놓도록 강하게 유도
+    user_text = user_text.strip()
+    prompt = (
+        SYS_PROMPT
+        + "\n\nUser: "
+        + user_text
+        + "\nAssistant:"
+    )
+    return prompt
+
 def run_infer(tok, model, text: str, max_new_tokens: int = 256) -> Dict[str, Any]:
-    messages = [
-        {"role": "system", "content": SYS_PROMPT},
-        {"role": "user", "content": text},
-    ]
-    inputs = tok.apply_chat_template(messages, return_tensors="pt", add_generation_prompt=True).to(model.device)
+    prompt = build_prompt(text)
+    inputs = tok(prompt, return_tensors="pt").to(model.device)
+
     with torch.no_grad():
         out = model.generate(
-            inputs=inputs,
+            **inputs,
             max_new_tokens=max_new_tokens,
             do_sample=False,
             eos_token_id=tok.eos_token_id,
         )
-    # 디코드 후, 프롬프트를 제외한 생성 텍스트만 슬라이스
+
+    # 생성 텍스트 디코딩 (프롬프트 포함일 수 있으므로 JSON 추출기 사용)
     full_text = tok.decode(out[0], skip_special_tokens=True)
-    # chat_template를 쓰면 원문 메시지+assistant 토막이 같이 들어오므로,
-    # 마지막 assistant 영역만 남도록 단순히 마지막 '{'부터 복구 파이프라인으로 처리
     json_candidate = extract_best_json(full_text)
     if json_candidate is None:
         return {"has_sensitive": False, "entities": []}
     try:
         parsed = json.loads(json_candidate)
-        # 형식 방어 — 필수 키 강제
         if not isinstance(parsed, dict):
             raise ValueError("not a dict")
         if "has_sensitive" not in parsed or "entities" not in parsed:
@@ -206,6 +217,9 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_dir, device_map="auto", torch_dtype="auto", local_files_only=True, trust_remote_code=True
     )
+    model.eval()
+    torch.set_grad_enabled(False)
+
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
@@ -219,6 +233,7 @@ def main():
         if not sys.stdin.isatty():
             samples = [line.strip() for line in sys.stdin if line.strip()]
         else:
+            # 입력이 전혀 없으면 안전 폴백 한 줄만 출력
             print(json.dumps({"has_sensitive": False, "entities": []}, ensure_ascii=False))
             return
 

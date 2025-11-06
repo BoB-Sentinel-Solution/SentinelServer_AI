@@ -14,7 +14,7 @@ class InItem(BaseModel):
 
     host: Optional[str] = None     # 대상 서비스 호스트 (예: chatgpt.com)
     hostname: Optional[str] = None # 구 에이전트 필드
-    PCName: Optional[str] = None  # 신 에이전트 필드 (hostname 대체)
+    pc_name: Optional[str] = None   # <- 에이전트가 보내는 PCName 수용
 
     prompt: str
     attachment: Optional[Attachment] = None

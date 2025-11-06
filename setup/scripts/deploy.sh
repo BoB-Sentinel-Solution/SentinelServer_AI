@@ -95,7 +95,7 @@ echo "[CHECK] waiting for health (max 10s)"
 ok=0
 resp=""
 for i in $(seq 1 10); do
-  resp="$(curl -sk --max-time 1 https://127.0.0.1/api/healthz || true)"
+  resp="$(curl -sk --max-time 1 https://127.0.0.1/healthz || true)"
   if echo "$resp" | grep -q '"ok"[[:space:]]*:[[:space:]]*true'; then
     echo "Health OK at try $i -> $resp"
     ok=1; break

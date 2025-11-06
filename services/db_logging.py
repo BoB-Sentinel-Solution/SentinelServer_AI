@@ -78,7 +78,7 @@ class DbLoggingService:
             public_ip       = item.public_ip,
             private_ip      = item.private_ip,
             host            = item.host or "unknown",
-            hostname        = item.hostname,
+            hostname        = (item.hostname or item.pc_name),
             prompt          = prompt_text,
             attachment      = (item.attachment.dict() if item.attachment else None),
             interface       = item.interface or "llm",

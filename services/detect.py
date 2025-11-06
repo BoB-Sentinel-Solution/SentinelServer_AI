@@ -1,58 +1,66 @@
 # services/detect.py
+# AI 기반 중요정보 탐지기로 교체 (오프라인 로컬 모델 사용)
+from __future__ import annotations
+
 import re
 from typing import List, Tuple
 from schemas import Entity
+from services.ai_detector import analyze_text  # 싱글톤 분석기 (GPU 고정 구성)
 
-# (더미) 정규식 기반 탐지기
-_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
-_PHONE_RE = re.compile(r"(01[016789]-?\d{3,4}-?\d{4})")
-_PASSWORD_RE = re.compile(r"(?i)(?:password|패스워드)\s*[:=]?\s*([^\s,;]+)")
-_USERNAME_RE = re.compile(r"(?i)(?:username|user|id|계정)\s*[:=]?\s*([A-Za-z0-9._-]{3,})")
-_CARD_RE = re.compile(r"\b(?:\d[ -]*?){13,19}\b")  # 과탐지 주의
-
-def _add_entity(entities: List[Entity], text: str, span: Tuple[int, int], label: str):
-    b, e = span
-    if 0 <= b < e <= len(text):
-        entities.append(Entity(value=text[b:e], begin=b, end=e, label=label))
-
-def _iter_matches_with_span(pattern: re.Pattern, text: str, group: int = 0):
-    for m in pattern.finditer(text):
-        if group == 0:
-            yield m.span(0)
-        else:
-            val = m.group(group)
-            if not val:
-                continue
-            start = text.find(val, max(m.start(group) - 2, 0), min(m.end(group) + 2, len(text)))
-            if start < 0:
-                start = m.start(group)
-            yield (start, start + len(val))
+def _non_overlapping_spans_by_value(text: str, value: str) -> List[Tuple[int, int]]:
+    """
+    주어진 value를 원문에서 찾되, 겹치지 않게 순차 매칭.
+    여러 번 등장하면 앞에서부터 가능한 곳에 1개씩만 할당.
+    """
+    if not value:
+        return []
+    spans: List[Tuple[int, int]] = []
+    taken = [False] * (len(text) + 1)
+    pat = re.escape(value)
+    for m in re.finditer(pat, text):
+        b, e = m.span()
+        if any(taken[b:e]):
+            continue
+        for i in range(b, e):
+            taken[i] = True
+        spans.append((b, e))
+    return spans
 
 def detect_entities(text: str) -> List[Entity]:
+    """
+    AI 탐지 결과(entities: [{type, value}...])를
+    기존 스키마(Entity(value, begin, end, label))로 변환.
+    """
     ents: List[Entity] = []
     if not text:
         return ents
 
-    for span in _iter_matches_with_span(_EMAIL_RE, text):
-        _add_entity(ents, text, span, "EMAIL")
+    try:
+        res = analyze_text(text)  # {"has_sensitive": bool, "entities": [{type, value}, ...]}
+    except Exception:
+        # AI 실패 시 안전 폴백: 빈 결과
+        return ents
 
-    for span in _iter_matches_with_span(_PHONE_RE, text, group=1):
-        _add_entity(ents, text, span, "PHONE")
+    raw_entities = res.get("entities", []) if isinstance(res, dict) else []
+    if not isinstance(raw_entities, list):
+        return ents
 
-    for span in _iter_matches_with_span(_PASSWORD_RE, text, group=1):
-        _add_entity(ents, text, span, "PASSWORD")
+    # 비겹침 스팬으로 begin/end 복원
+    for item in raw_entities:
+        t = str(item.get("type", "")).strip().upper() if isinstance(item, dict) else ""
+        v = str(item.get("value", "")).strip() if isinstance(item, dict) else ""
+        if not (t and v):
+            continue
 
-    for span in _iter_matches_with_span(_USERNAME_RE, text, group=1):
-        _add_entity(ents, text, span, "USERNAME")
+        spans = _non_overlapping_spans_by_value(text, v)
+        # 값이 원문에 없을 수도 있으므로(전처리·공백 차이 등) 그런 경우는 스킵
+        for (b, e) in spans or []:
+            ents.append(Entity(value=text[b:e], begin=b, end=e, label=t))
 
-    for span in _iter_matches_with_span(_CARD_RE, text):
-        raw = text[span[0]:span[1]]
-        digits = re.sub(r"[ -]", "", raw)
-        if 13 <= len(digits) <= 19:
-            _add_entity(ents, text, span, "CARD_NO")
-
+    # 위치순 정렬(겹침은 위 로직에서 방지)
     ents.sort(key=lambda e: (e.begin, -e.end))
     return ents
 
 def has_sensitive_any(prompt_entities: List[Entity], ocr_entities: List[Entity]) -> bool:
+    # 하나라도 엔티티가 있으면 민감정보 포함으로 처리
     return bool(prompt_entities or ocr_entities)

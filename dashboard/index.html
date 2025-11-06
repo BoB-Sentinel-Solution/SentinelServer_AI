@@ -11,6 +11,7 @@
     :root{
       --bg:#0b1020; --card:#121a36; --border:#1f2a4a; --text:#eef1f6; --muted:#a9b3c9;
       --gap:16px; --chart-h: clamp(220px, 28vh, 360px); --card-radius:14px;
+      --tip-bg:#0f1733; --tip-border:#2a3a72; --tip-text:#eaf0ff;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
@@ -47,7 +48,7 @@
       background:#1b2450; color:#d8e0ff; border:1px solid var(--border);
       user-select:none;
     }
-    .popover-summary::-webkit-details-marker{ display:none; } /* 기본 삼각형 제거 */
+    .popover-summary::-webkit-details-marker{ display:none; }
     .popover-panel{
       position:absolute; right:0; top:36px; z-index:9999;
       width:520px; max-width:92vw;
@@ -57,10 +58,31 @@
       padding:12px;
     }
     .popover-details:not([open]) .popover-panel{ display:none; }
-
     .pop-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
     .pop-title{font-size:14px;font-weight:700}
-    .pill{display:inline-block;background:#172042;border:1px solid var(--border);padding:4px 8px;border-radius:999px;margin:3px 6px;font-size:12px}
+
+    /* ====== ALLOWED 라벨 툴팁(hover/focus) ====== */
+    .pill{
+      display:inline-block; background:#172042; border:1px solid var(--border);
+      padding:4px 8px; border-radius:999px; margin:3px 6px; font-size:12px;
+      line-height:1; white-space:nowrap;
+    }
+    .tip{ position:relative; outline:none; }
+    .tip:focus-visible{ box-shadow:0 0 0 2px rgba(59,130,246,.6); }
+
+    .tip:hover::after, .tip:focus::after{
+      content: attr(data-tip);
+      position:absolute; left:50%; transform:translateX(-50%);
+      bottom: calc(100% + 10px);
+      min-width:220px; max-width:420px;
+      background: var(--tip-bg); color: var(--tip-text);
+      border:1px solid var(--tip-border); padding:10px 12px; border-radius:10px;
+      font-size:12px; line-height:1.5; text-align:left; white-space:normal; z-index:10000;
+    }
+    .tip:hover::before, .tip:focus::before{
+      content:""; position:absolute; left:50%; transform:translateX(-50%); bottom:100%;
+      border-width:8px; border-style:solid; border-color:transparent transparent var(--tip-bg) transparent; z-index:10001;
+    }
     .grid2{display:grid;grid-template-columns:1fr;gap:10px}
     @media(min-width:700px){.grid2{grid-template-columns:repeat(2,1fr)}}
     .sec{border:1px solid var(--border);border-radius:10px;padding:10px}
@@ -83,7 +105,6 @@
           <div class="popover-panel" role="dialog" aria-live="polite">
             <div class="pop-header">
               <div class="pop-title">중요정보 규정 &amp; ALLOWED 유형</div>
-              <!-- 닫기는 summary를 다시 클릭 -->
             </div>
 
             <div class="sec" style="margin-bottom:10px">
@@ -95,50 +116,76 @@
             </div>
 
             <div class="grid2">
+              <!-- 기본 신원 정보 -->
               <div class="sec">
                 <h4>기본 신원 정보</h4>
                 <div>
-                  <span class="pill">NAME</span><span class="pill">PHONE</span>
-                  <span class="pill">EMAIL</span><span class="pill">ADDRESS</span>
-                  <span class="pill">POSTAL_CODE</span>
+                  <span class="pill tip" tabindex="0" data-tip="개인을 식별할 수 있는 법적 풀네임 또는 명확히 특정 가능한 이름.">NAME</span>
+                  <span class="pill tip" tabindex="0" data-tip="개인 또는 조직의 유효한 전화번호 형식 전체.">PHONE</span>
+                  <span class="pill tip" tabindex="0" data-tip="특정 우편함을 식별하는 이메일 주소.">EMAIL</span>
+                  <span class="pill tip" tabindex="0" data-tip="현실의 특정 위치를 나타내는 우편/거소 주소(도로명·지번·상세 포함 가능).">ADDRESS</span>
+                  <span class="pill tip" tabindex="0" data-tip="우편물 배송을 위한 우편번호/ZIP 코드.">POSTAL_CODE</span>
                 </div>
               </div>
+
+              <!-- 공적 식별번호 -->
               <div class="sec">
                 <h4>공적 식별번호</h4>
                 <div>
-                  <span class="pill">PERSONAL_CUSTOMS_ID</span><span class="pill">RESIDENT_ID</span>
-                  <span class="pill">PASSPORT</span><span class="pill">DRIVER_LICENSE</span>
-                  <span class="pill">FOREIGNER_ID</span><span class="pill">HEALTH_INSURANCE_ID</span>
-                  <span class="pill">BUSINESS_ID</span><span class="pill">MILITARY_ID</span>
+                  <span class="pill tip" tabindex="0" data-tip="수입·수출을 위해 발급되는 개인통관고유번호.">PERSONAL_CUSTOMS_ID</span>
+                  <span class="pill tip" tabindex="0" data-tip="개인을 고유하게 식별하는 주민등록번호.">RESIDENT_ID</span>
+                  <span class="pill tip" tabindex="0" data-tip="정부가 발급하는 여권 번호.">PASSPORT</span>
+                  <span class="pill tip" tabindex="0" data-tip="운전면허 발급기관이 부여한 면허번호.">DRIVER_LICENSE</span>
+                  <span class="pill tip" tabindex="0" data-tip="정부가 부여하는 외국인등록번호.">FOREIGNER_ID</span>
+                  <span class="pill tip" tabindex="0" data-tip="공·사보험 가입과 연계된 건강보험 증번호.">HEALTH_INSURANCE_ID</span>
+                  <span class="pill tip" tabindex="0" data-tip="정부가 부여하는 사업자(법인) 등록번호.">BUSINESS_ID</span>
+                  <span class="pill tip" tabindex="0" data-tip="군 복무자에게 부여되는 군 식별 번호.">MILITARY_ID</span>
                 </div>
               </div>
+
+              <!-- 인증 정보 -->
               <div class="sec">
                 <h4>인증 정보</h4>
                 <div>
-                  <span class="pill">JWT</span><span class="pill">API_KEY</span>
-                  <span class="pill">GITHUB_PAT</span><span class="pill">PRIVATE_KEY</span>
+                  <span class="pill tip" tabindex="0" data-tip="인증/인가에 사용되는 JSON Web Token 문자열.">JWT</span>
+                  <span class="pill tip" tabindex="0" data-tip="서비스에서 발급하는 API 접근 자격증명.">API_KEY</span>
+                  <span class="pill tip" tabindex="0" data-tip="GitHub 리포지토리/API 권한을 부여하는 개인 액세스 토큰.">GITHUB_PAT</span>
+                  <span class="pill tip" tabindex="0" data-tip="SSH/TLS/PGP 등 암호학적 개인키 문자열.">PRIVATE_KEY</span>
                 </div>
               </div>
+
+              <!-- 금융 정보 -->
               <div class="sec">
                 <h4>금융 정보</h4>
                 <div>
-                  <span class="pill">CARD_NUMBER</span><span class="pill">CARD_EXPIRY</span>
-                  <span class="pill">BANK_ACCOUNT</span><span class="pill">CARD_CVV</span>
-                  <span class="pill">PAYMENT_PIN</span><span class="pill">MOBILE_PAYMENT_PIN</span>
+                  <span class="pill tip" tabindex="0" data-tip="결제에 사용되는 카드 기본 계정 번호(PAN).">CARD_NUMBER</span>
+                  <span class="pill tip" tabindex="0" data-tip="결제 카드의 유효기간을 나타내는 값(MM/YY 등).">CARD_EXPIRY</span>
+                  <span class="pill tip" tabindex="0" data-tip="자금 이체에 사용되는 은행 계좌 식별자.">BANK_ACCOUNT</span>
+                  <span class="pill tip" tabindex="0" data-tip="비대면 결제 검증에 쓰이는 카드 보안 코드(CVC/CVV).">CARD_CVV</span>
+                  <span class="pill tip" tabindex="0" data-tip="은행/카드 이용 시 사용하는 4자리 개인 비밀번호(PIN).">PAYMENT_PIN</span>
+                  <span class="pill tip" tabindex="0" data-tip="모바일 결제를 승인하기 위한 6자리 PIN.">MOBILE_PAYMENT_PIN</span>
                 </div>
               </div>
+
+              <!-- 가상화폐 정보 -->
               <div class="sec">
                 <h4>가상화폐 정보</h4>
                 <div>
-                  <span class="pill">MNEMONIC</span><span class="pill">CRYPTO_PRIVATE_KEY</span>
-                  <span class="pill">HD_WALLET</span><span class="pill">PAYMENT_URI_QR</span>
+                  <span class="pill tip" tabindex="0" data-tip="지갑 키를 유도하기 위해 사용되는 순서 있는 시드 문구(니모닉).">MNEMONIC</span>
+                  <span class="pill tip" tabindex="0" data-tip="가상자산 접근·이체를 통제하는 개인키.">CRYPTO_PRIVATE_KEY</span>
+                  <span class="pill tip" tabindex="0" data-tip="계층적 결정형(HD) 지갑의 확장 키(비공개/공개).">HD_WALLET</span>
+                  <span class="pill tip" tabindex="0" data-tip="BTC/ETH/XRP/SOL/TRON 등 주소·금액·메모 등을 담는 결제 URI/QR.">PAYMENT_URI_QR</span>
                 </div>
               </div>
+
+              <!-- 네트워크/기타 -->
               <div class="sec">
                 <h4>네트워크/기타</h4>
                 <div>
-                  <span class="pill">IPV4</span><span class="pill">IPV6</span>
-                  <span class="pill">MAC_ADDRESS</span><span class="pill">IMEI</span>
+                  <span class="pill tip" tabindex="0" data-tip="네트워크 상의 호스트를 식별하는 IPv4 주소.">IPV4</span>
+                  <span class="pill tip" tabindex="0" data-tip="네트워크 상의 호스트를 식별하는 IPv6 주소.">IPV6</span>
+                  <span class="pill tip" tabindex="0" data-tip="네트워크 인터페이스의 L2(MAC) 하드웨어 주소.">MAC_ADDRESS</span>
+                  <span class="pill tip" tabindex="0" data-tip="셀룰러 네트워크용 단말 장비 식별 번호.">IMEI</span>
                 </div>
               </div>
             </div>

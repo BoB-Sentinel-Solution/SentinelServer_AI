@@ -55,124 +55,64 @@ _ALLOWED = {
 }
 
 def _extract_json(s: str) -> Dict[str, Any]:
-    """모델 출력의 마지막 JSON 오브젝트만 안전 추출."""
     end = s.rfind("}")
     if end == -1:
         return {"has_sensitive": False, "entities": []}
-    level = 0
-    start = None
-    in_str = False
-    esc = False
+    level = 0; start = None; in_str = False; esc = False
     for i in range(end, -1, -1):
         ch = s[i]
         if in_str:
-            if esc:
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = False
+            if esc: esc=False
+            elif ch == "\\": esc=True
+            elif ch == '"': in_str=False
             continue
         else:
-            if ch == '"':
-                in_str = True
-                continue
-            if ch == "}":
-                level += 1
+            if ch == '"': in_str=True; continue
+            if ch == "}": level += 1
             elif ch == "{":
                 level -= 1
                 if level == 0:
-                    start = i
-                    break
+                    start = i; break
     if start is None:
         return {"has_sensitive": False, "entities": []}
     try:
-        return json.loads(s[start:end + 1])
+        return json.loads(s[start:end+1])
     except Exception:
         return {"has_sensitive": False, "entities": []}
 
-def _norm_entities(text: str, ents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """LLM 결과의 엔티티를 서버 스키마에 맞게 정규화:
-       - 'type' → 'label'
-       - begin/end 미제공 시 value의 최초 매칭 위치로 복구
-       - 허용 라벨 화이트리스트 적용
-    """
-    if not isinstance(text, str):
-        text = "" if text is None else str(text)
-    out: List[Dict[str, Any]] = []
-    for e in ents or []:
-        label = (e.get("label") or e.get("type") or "").strip().upper()
-        if label not in _ALLOWED:
-            continue
-        value = e.get("value")
-        if not isinstance(value, str) or not value:
-            continue
-        begin = e.get("begin")
-        end = e.get("end")
-        if not (isinstance(begin, int) and isinstance(end, int) and 0 <= begin < end <= len(text)):
-            idx = text.find(value)
-            if idx == -1:
-                # LLM이 공백/마스킹 등 변형으로 value를 다르게 낸 경우 — 위치 복구 불가 → 스킵
-                continue
-            begin, end = idx, idx + len(value)
-        # value는 원문 슬라이스로 보정
-        value = text[begin:end]
-        out.append({"value": value, "begin": begin, "end": end, "label": label})
-    return out
-
 class _Detector:
     def __init__(self, model_dir: str, max_new_tokens: int = 256):
-        self.model_dir = model_dir
-        self.max_new_tokens = max_new_tokens
-        self.tok = AutoTokenizer.from_pretrained(
-            model_dir, use_fast=True, local_files_only=True, trust_remote_code=True
-        )
-        # accelerate 설치되어 있으므로 device_map="auto" 사용 가능
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_dir,
-            device_map="auto",
-            torch_dtype="auto",
-            local_files_only=True,
-            trust_remote_code=True,
-            low_cpu_mem_usage=True,
-        )
+        self.tok = AutoTokenizer.from_pretrained(model_dir, use_fast=True, local_files_only=True, trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_dir, device_map="auto", torch_dtype="auto",
+                                                          local_files_only=True, trust_remote_code=True)
         if self.tok.pad_token is None:
             self.tok.pad_token = self.tok.eos_token
+        self.max_new_tokens = max_new_tokens
         self.lock = threading.Lock()
 
     def analyze(self, text: str) -> Dict[str, Any]:
-        messages = [
-            {"role": "system", "content": SYS_PROMPT},
-            {"role": "user", "content": text or ""},
-        ]
-        with self.lock, torch.no_grad():
-            inputs = self.tok.apply_chat_template(
-                messages, return_tensors="pt", add_generation_prompt=True
-            ).to(self.model.device)
-            out = self.model.generate(
-                inputs=inputs,
-                max_new_tokens=self.max_new_tokens,
-                do_sample=False,
-                eos_token_id=self.tok.eos_token_id,
-            )
+        messages = [{"role":"system","content":SYS_PROMPT},
+                    {"role":"user", "content":text or ""}]
+        with self.lock:
+            inputs = self.tok.apply_chat_template(messages, return_tensors="pt", add_generation_prompt=True).to(self.model.device)
+            with torch.no_grad():
+                out = self.model.generate(inputs=inputs, max_new_tokens=self.max_new_tokens,
+                                          do_sample=False, eos_token_id=self.tok.eos_token_id)
             decoded = self.tok.decode(out[0], skip_special_tokens=True)
-
         parsed = _extract_json(decoded)
-        ents = parsed.get("entities") if isinstance(parsed, dict) else []
-        ents = ents if isinstance(ents, list) else []
+        ents = []
+        for e in parsed.get("entities", []):
+            t = str(e.get("type","")).strip().upper()
+            v = str(e.get("value","")).strip()
+            if t and v:
+                ents.append({"type": t, "value": v})
+        return {"has_sensitive": bool(parsed.get("has_sensitive", False)), "entities": ents}
 
-        entities_norm = _norm_entities(text, ents)
-        has_sensitive = bool(parsed.get("has_sensitive")) or bool(entities_norm)
-
-        return {"has_sensitive": has_sensitive, "entities": entities_norm}
-
-# ---- 글로벌 싱글톤 (부팅시 1회 초기화)
 _detector_singleton: _Detector | None = None
 
 def init_from_env() -> None:
     global _detector_singleton
-    if _detector_singleton is not None:
-        return
+    if _detector_singleton: return
     model_dir = os.getenv("MODEL_DIR", "").strip()
     if not model_dir:
         raise RuntimeError("MODEL_DIR env not set")

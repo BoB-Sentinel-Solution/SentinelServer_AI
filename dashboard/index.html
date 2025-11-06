@@ -5,12 +5,11 @@
   <meta charset="utf-8" />
   <title>Sentinel Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- reset: CDN 사용 -->
+  <!-- reset -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset/dist/reset.min.css">
   <style>
     :root{
       --bg:#0b1020; --card:#121a36; --border:#1f2a4a; --text:#eef1f6; --muted:#a9b3c9;
-      --accent:#3b82f6; --accent2:#22c55e; --accent3:#eab308; --accent4:#ef4444;
       --gap:16px; --chart-h: clamp(220px, 28vh, 360px); --card-radius:14px;
     }
     *{box-sizing:border-box}
@@ -37,15 +36,115 @@
     th{color:#cfe0ff;text-align:left}
     .logs-wrap{max-height:clamp(220px, 34vh, 460px);overflow:auto;border-radius:10px;border:1px solid var(--border)}
     @media (max-width: 480px){ .kpi .num{font-size:32px} }
+
+    /* ====== CSS-only 팝오버(details/summary) ====== */
+    .head-ctl{ position:relative; display:flex; align-items:center; gap:8px }
+    .popover-details{ position:relative; }
+    .popover-summary{
+      list-style:none; cursor:pointer;
+      width:28px; height:28px; border-radius:50%;
+      display:inline-flex; align-items:center; justify-content:center;
+      background:#1b2450; color:#d8e0ff; border:1px solid var(--border);
+      user-select:none;
+    }
+    .popover-summary::-webkit-details-marker{ display:none; } /* 기본 삼각형 제거 */
+    .popover-panel{
+      position:absolute; right:0; top:36px; z-index:9999;
+      width:520px; max-width:92vw;
+      background:#0a0f1f; color:#eef1f6;
+      border:1px solid var(--border); border-radius:12px;
+      box-shadow:0 10px 40px rgba(0,0,0,.45);
+      padding:12px;
+    }
+    .popover-details:not([open]) .popover-panel{ display:none; }
+
+    .pop-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+    .pop-title{font-size:14px;font-weight:700}
+    .pill{display:inline-block;background:#172042;border:1px solid var(--border);padding:4px 8px;border-radius:999px;margin:3px 6px;font-size:12px}
+    .grid2{display:grid;grid-template-columns:1fr;gap:10px}
+    @media(min-width:700px){.grid2{grid-template-columns:repeat(2,1fr)}}
+    .sec{border:1px solid var(--border);border-radius:10px;padding:10px}
+    .sec h4{margin:0 0 6px 0;font-size:13px}
   </style>
-  <!-- 차트: CDN -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="wrap">
     <header>
       <h1>Sentinel Dashboard</h1>
-      <div class="muted">Auto Refresh 10s</div>
+      <div class="head-ctl">
+        <div class="muted">Auto Refresh 10s</div>
+
+        <!-- JS 없는 팝오버 -->
+        <details class="popover-details" aria-label="중요정보 규정">
+          <summary class="popover-summary" title="중요정보 규정 보기">?</summary>
+
+          <div class="popover-panel" role="dialog" aria-live="polite">
+            <div class="pop-header">
+              <div class="pop-title">중요정보 규정 &amp; ALLOWED 유형</div>
+              <!-- 닫기는 summary를 다시 클릭 -->
+            </div>
+
+            <div class="sec" style="margin-bottom:10px">
+              <h4>정의</h4>
+              <div class="muted" style="line-height:1.5">
+                유출 시 사용자에게 피해가 발생할 수 있는 정보를 ‘중요정보’로 정의합니다.
+                아래 <b>허용 목록(allowlist)</b>에 포함된 라벨만 중요정보로 간주합니다.
+              </div>
+            </div>
+
+            <div class="grid2">
+              <div class="sec">
+                <h4>기본 신원 정보</h4>
+                <div>
+                  <span class="pill">NAME</span><span class="pill">PHONE</span>
+                  <span class="pill">EMAIL</span><span class="pill">ADDRESS</span>
+                  <span class="pill">POSTAL_CODE</span>
+                </div>
+              </div>
+              <div class="sec">
+                <h4>공적 식별번호</h4>
+                <div>
+                  <span class="pill">PERSONAL_CUSTOMS_ID</span><span class="pill">RESIDENT_ID</span>
+                  <span class="pill">PASSPORT</span><span class="pill">DRIVER_LICENSE</span>
+                  <span class="pill">FOREIGNER_ID</span><span class="pill">HEALTH_INSURANCE_ID</span>
+                  <span class="pill">BUSINESS_ID</span><span class="pill">MILITARY_ID</span>
+                </div>
+              </div>
+              <div class="sec">
+                <h4>인증 정보</h4>
+                <div>
+                  <span class="pill">JWT</span><span class="pill">API_KEY</span>
+                  <span class="pill">GITHUB_PAT</span><span class="pill">PRIVATE_KEY</span>
+                </div>
+              </div>
+              <div class="sec">
+                <h4>금융 정보</h4>
+                <div>
+                  <span class="pill">CARD_NUMBER</span><span class="pill">CARD_EXPIRY</span>
+                  <span class="pill">BANK_ACCOUNT</span><span class="pill">CARD_CVV</span>
+                  <span class="pill">PAYMENT_PIN</span><span class="pill">MOBILE_PAYMENT_PIN</span>
+                </div>
+              </div>
+              <div class="sec">
+                <h4>가상화폐 정보</h4>
+                <div>
+                  <span class="pill">MNEMONIC</span><span class="pill">CRYPTO_PRIVATE_KEY</span>
+                  <span class="pill">HD_WALLET</span><span class="pill">PAYMENT_URI_QR</span>
+                </div>
+              </div>
+              <div class="sec">
+                <h4>네트워크/기타</h4>
+                <div>
+                  <span class="pill">IPV4</span><span class="pill">IPV6</span>
+                  <span class="pill">MAC_ADDRESS</span><span class="pill">IMEI</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
     </header>
 
     <section class="kpis" style="margin-bottom:8px">
@@ -107,7 +206,7 @@
     </section>
   </div>
 
-  <!-- 앱 스크립트: 정적은 /dashboard/* -->
+  <!-- 외부 스크립트 (CSP: 'self' 허용) -->
   <script src="/dashboard/app.js"></script>
 </body>
 </html>

@@ -14,10 +14,7 @@ from services.attachment import save_attachment_file
 from services.similarity import best_similarity_against_folder
 from repositories.log_repo import LogRepository
 
-# 기존 내부 엔진은 비활성화
-# from services.detect import analyze_with_entities  # 옵션 A
-
-# 새 외부 판별기 러너
+# 외부 판별기 러너
 from services.ai_external import OfflineDetectorRunner
 
 ADMIN_IMAGE_DIR = Path("./SentinelServer_AI/adminset/image")
@@ -31,7 +28,7 @@ _DETECTOR = OfflineDetectorRunner(
 
 def _to_labeled_spans(text: str, entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    ai_external의 결과( type/value/(begin/end) ) 를
+    ai_external의 결과( type/value/(begin/end) )를
     서버 공통 스키마(label/value/begin/end)로 매핑.
     """
     out: List[Dict[str, Any]] = []
@@ -40,14 +37,14 @@ def _to_labeled_spans(text: str, entities: List[Dict[str, Any]]) -> List[Dict[st
         v = e.get("value")
         if not isinstance(t, str) or not isinstance(v, str) or not v.strip():
             continue
-        begin = e.get("begin")
-        end = e.get("end")
-        item = {"label": t.strip().upper(), "value": v.strip()}
-        if isinstance(begin, int) and isinstance(end, int):
-            item["begin"] = begin
-            item["end"] = end
+        item: Dict[str, Any] = {"label": t.strip().upper(), "value": v.strip()}
+        b = e.get("begin"); en = e.get("end")
+        if isinstance(b, int) and isinstance(en, int):
+            item["begin"] = b
+            item["end"] = en
         out.append(item)
     return out
+
 
 class DbLoggingService:
     @staticmethod
@@ -84,14 +81,13 @@ class DbLoggingService:
 
         prompt_entities_raw = det_prompt.get("entities", []) or []
         prompt_entities = _to_labeled_spans(prompt_text, prompt_entities_raw)
+
         det_ocr_ms = 0
         ocr_entities: List[Dict[str, Any]] = []
-
         if ocr_used and ocr_text:
             try:
                 det_ocr = _DETECTOR.analyze_text(ocr_text, return_spans=True)
                 ocr_entities_raw = det_ocr.get("entities", []) or []
-                # OCR 결과도 label/value/(begin/end)로 정규화
                 ocr_entities = _to_labeled_spans(ocr_text, ocr_entities_raw)
                 det_ocr_ms = int(det_ocr.get("processing_ms", 0) or 0)
             except Exception:
@@ -114,7 +110,7 @@ class DbLoggingService:
         ):
             try:
                 if saved_path and ADMIN_IMAGE_DIR.exists():
-                    score, ref = best_similarity_against_folder(saved_path, ADMIN_IMAGE_DIR)
+                    score, _ = best_similarity_against_folder(saved_path, ADMIN_IMAGE_DIR)
                     if score >= SIMILARITY_THRESHOLD:
                         file_blocked = True
                         allow = False
@@ -123,14 +119,11 @@ class DbLoggingService:
                 pass
 
         # 5) 마스킹(프롬프트만)
-        # Entity 모델로 검증 후 마스킹에 전달
         masked_entities: List[Entity] = []
         for e in prompt_entities:
             try:
-                # Entity 스키마가 label/value/begin/end 를 기대
                 masked_entities.append(Entity(**e))
             except Exception:
-                # 라벨/스팬 불완전시 스킵
                 pass
 
         modified_prompt = mask_by_entities(prompt_text, masked_entities)
@@ -138,8 +131,8 @@ class DbLoggingService:
         # 전체 처리시간
         processing_ms = max(int((time.perf_counter() - t0) * 1000), ai_ms)
 
-        # hostname 우선, 없으면 pc_name/PCName 대체
-        host_name = item.hostname or getattr(item, "pc_name", None) or getattr(item, "PCName", None)
+        # hostname 우선, 없으면 pc_name 대체 (schemas가 별칭 처리)
+        host_name = item.hostname or item.pc_name
 
         # 6) DB 저장
         rec = LogRecord(
@@ -148,15 +141,14 @@ class DbLoggingService:
             public_ip       = item.public_ip,
             private_ip      = item.private_ip,
             host            = item.host or "unknown",
-            host_name       = item.hostname or item.pc_name
+            hostname        = host_name,                 # ← 컬럼명 정확히 'hostname'
             prompt          = prompt_text,
             attachment      = DbLoggingService._serialize_attachment(item.attachment),
             interface       = item.interface or "llm",
 
             modified_prompt = modified_prompt,
             has_sensitive   = has_sensitive,
-            # 프롬프트 엔티티만 저장/표시 (label/value/begin/end 로 정규화된 값 사용)
-            entities        = [dict(e) for e in prompt_entities],
+            entities        = [dict(e) for e in prompt_entities],  # 프롬프트 엔티티만 저장
             processing_ms   = processing_ms,
 
             file_blocked    = file_blocked,
@@ -171,8 +163,10 @@ class DbLoggingService:
             host            = rec.host,
             modified_prompt = rec.modified_prompt,
             has_sensitive   = rec.has_sensitive,
-            # 응답에서도 begin/end/label이 모두 있는 엔티티만 노출
-            entities        = [Entity(**e) for e in rec.entities if set(e).issuperset({"value","begin","end","label"})],
+            entities        = [
+                Entity(**e) for e in rec.entities
+                if isinstance(e, dict) and set(e).issuperset({"value","begin","end","label"})
+            ],
             processing_ms   = rec.processing_ms,
             file_blocked    = rec.file_blocked,
             allow           = rec.allow,

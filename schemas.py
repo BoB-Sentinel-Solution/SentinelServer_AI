@@ -7,7 +7,7 @@ class Attachment(BaseModel):
     format: Optional[str] = None   # 예: "image/png" | null
     data: Optional[str] = None     # base64 | null
 
-cclass InItem(BaseModel):
+class InItem(BaseModel):
     time: str
     public_ip: Optional[str] = None
     private_ip: Optional[str] = None

@@ -33,8 +33,7 @@ PATTERNS = {
 """, X),
 
 "EMAIL": re.compile(r"""
-(?xi)
-(?:^|[\s<\(\["':.,;!?=]|[가-힣])          # ← lookbehind 대신 '소비형' 앞 컨텍스트
+(?<=^|[\s<\(\["':.,;!?=]|[가-힣])
 (?:
   # 1) "표시명" + <이메일>
   (?:"[^"\r\n]*"\s*)?<
@@ -45,15 +44,15 @@ PATTERNS = {
   >
   |
   # 2) 일반 이메일 (길이/연속점 규칙 포함)
-  (?=.{1,254}$)            # 전체 길이 ≤ 254
-  (?!\.)                   # 로컬 '.' 시작 금지
-  (?!.*\.\.)               # 로컬 연속 '..' 금지
+  (?=.{1,254}$)
+  (?!\.)
+  (?!.*\.\.)
   ([A-Za-z0-9._%+-]{1,64}@
     (?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+
     [A-Za-z]{2,63}
   )
 )
-(?=$|[\s>\)\]"':.,;!?=]|[가-힣])          # 뒤는 lookahead 그대로 OK
+(?=$|[\s>\)\]"':.,;!?=]|[가-힣])
 """, re.X | re.I),
 
     # PERSONAL_CUSTOMS_ID (개인통관고유부호)
@@ -127,9 +126,7 @@ PATTERNS = {
 (?![0-9A-Za-z])
 """, X | I),
 
-    # PRIVATE_KEY (SSH/TLS/PGP 개인키 - 멀티라인)
-    "PRIVATE_KEY": re.compile(r"""
-(?ms)
+"PRIVATE_KEY": re.compile(r"""
 ^-----BEGIN OPENSSH PRIVATE KEY-----\r?\n[A-Za-z0-9+/=\r\n]+^-----END OPENSSH PRIVATE KEY-----$
 |
 ^-----BEGIN (?:RSA|EC|DSA) PRIVATE KEY-----\r?\n(?:[A-Za-z0-9+/=\r\n]+)^-----END (?:RSA|EC|DSA) PRIVATE KEY-----$
@@ -220,11 +217,9 @@ PATTERNS = {
 (?!\d)
 """, X),
 
-    # IPV6 (브래킷/비브래킷)
     "IPV6": re.compile(r"""
-(?xms)
 (
-  \[ # bracketed
+  \[
     (?:
       (?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}|
       (?:[A-Fa-f0-9]{1,4}:){1,7}:|

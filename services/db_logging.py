@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid, time, os
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from schemas import InItem, ServerOut, Entity
@@ -69,18 +69,49 @@ def _dedup_spans(base: List[Dict[str, Any]], extra: List[Dict[str, Any]]) -> Lis
             out.append(e)
     return out
 
-def _pick_alert(det_ai: Dict[str, Any]) -> str:
+# ---------- alert(근거) 생성 로직 ----------
+def _ent_key(e: Dict[str, Any]) -> Tuple[str, int, int]:
+    """엔티티를 (label, begin, end) 튜플 키로 식별."""
+    return (str(e.get("label", "")).upper(), int(e.get("begin", -1)), int(e.get("end", -1)))
+
+def _build_alert_from_merged(merged_ents: List[Dict[str, Any]],
+                             regex_src: List[Dict[str, Any]],
+                             ai_src: List[Dict[str, Any]]) -> str:
     """
-    로컬 AI가 반환한 근거 텍스트를 다양한 키에서 베스트-에포트로 추출.
-    없으면 빈 문자열.
+    최종 병합된 엔티티(= 실제 마스킹/저장에 쓰이는 것) 기준으로,
+    각 엔티티의 '출처'를 정규식/AI로 태깅하여 라벨을 소스별로 집계.
+    같은 라벨이라도 서로 다른 인스턴스면 각각 소스대로만 집계한다.
     """
-    if not isinstance(det_ai, dict):
-        return ""
-    for k in ("alert", "reason", "rationale", "explanation", "why", "basis", "evidence", "details", "notes"):
-        v = det_ai.get(k)
-        if isinstance(v, str) and v.strip():
-            return v.strip()
-    return ""
+    regex_keys = {_ent_key(e) for e in regex_src}
+    ai_keys    = {_ent_key(e) for e in ai_src}
+
+    labels_regex: List[str] = []
+    labels_ai: List[str] = []
+
+    for e in merged_ents:
+        k = _ent_key(e)
+        lab = str(e.get("label", "")).upper()
+        if k in regex_keys and k in ai_keys:
+            # 직렬 파이프라인 특성상 드뭄. 필요 시 한쪽만 집계.
+            labels_regex.append(lab)
+        elif k in regex_keys:
+            labels_regex.append(lab)
+        elif k in ai_keys:
+            labels_ai.append(lab)
+        else:
+            # 이 케이스는 거의 없음(병합 대상은 둘 중 하나에서 온 것이니까)
+            pass
+
+    only_regex = sorted(set(labels_regex))
+    only_ai    = sorted(set(labels_ai))
+
+    parts = []
+    if only_regex:
+        parts.append(f"{', '.join(only_regex)} 값이 정규식으로 식별되었습니다.")
+    if only_ai:
+        parts.append(f"{', '.join(only_ai)} 값은 AI로 식별되었습니다.")
+
+    return " ".join(parts)
 
 class DbLoggingService:
     @staticmethod
@@ -131,7 +162,7 @@ class DbLoggingService:
             regex_ents_ocr = []
 
         # 5) AI 보완 탐지 — 힌트 라벨 없이, 마스킹된 프롬프트만 전달
-        #    기대 출력: {"has_sensitive": bool, "entities":[{"type","value"}], "processing_ms": <int?>, "reason": "<근거>"}
+        #    기대 출력: {"has_sensitive": bool, "entities":[{"type","value"}], "processing_ms": <int?>}
         try:
             det_ai = _DETECTOR.analyze_text(masked_for_ai, return_spans=False)
         except Exception:
@@ -139,7 +170,6 @@ class DbLoggingService:
 
         ai_raw_ents = det_ai.get("entities", []) or []
         ai_ms = int(det_ai.get("processing_ms", 0) or 0)
-        alert_text = _pick_alert(det_ai)
 
         # 6) AI 결과를 원문 기준 스팬으로 재계산 → 정규식 결과와 병합
         ai_ents_rebased = _rebase_ai_entities_on_original(prompt_text, ai_raw_ents)
@@ -175,13 +205,25 @@ class DbLoggingService:
             [Entity(**e) for e in prompt_entities if set(e).issuperset({"label","value","begin","end"})]
         )
 
+        # 9) alert(근거) 생성 — 최종 병합 결과 기준으로 출처 집계
+        alert_text = _build_alert_from_merged(
+            merged_ents=prompt_entities,
+            regex_src=regex_ents_prompt,
+            ai_src=ai_ents_rebased,
+        )
+        if not alert_text and prompt_entities:
+            # 안전망: 최종 라벨만이라도 노출
+            labels = sorted({e["label"] for e in prompt_entities})
+            if labels:
+                alert_text = f"Detected: {', '.join(labels)}"
+
         # 전체 처리시간 (AI 처리시간도 포함해 최소값 보정)
         processing_ms = max(int((time.perf_counter() - t0) * 1000), ai_ms)
 
         # hostname 우선, 없으면 pc_name 대체 (schemas가 별칭 처리)
         host_name = item.hostname or item.pc_name
 
-        # 9) DB 저장 (프롬프트 엔티티만 저장)
+        # 10) DB 저장 (프롬프트 엔티티만 저장)
         rec = LogRecord(
             request_id      = request_id,
             time            = item.time,
@@ -204,7 +246,7 @@ class DbLoggingService:
         )
         LogRepository.create(db, rec)
 
-        # 10) 응답 (에이전트로 '근거' 전달)
+        # 11) 응답 (에이전트로 '근거' 전달)
         return ServerOut(
             request_id      = request_id,
             host            = rec.host,
@@ -218,5 +260,5 @@ class DbLoggingService:
             file_blocked    = rec.file_blocked,
             allow           = rec.allow,
             action          = rec.action,
-            alert           = alert_text,  # ← 추가: 근거 텍스트
+            alert           = alert_text,
         )

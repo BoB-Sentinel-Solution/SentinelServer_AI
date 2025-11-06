@@ -1,18 +1,17 @@
+<!-- dashboard/index.html -->
 <!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
   <title>Sentinel Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- reset: jsdelivr 허용이라 그대로 사용 -->
+  <!-- reset: CDN 사용 -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset/dist/reset.min.css">
   <style>
     :root{
       --bg:#0b1020; --card:#121a36; --border:#1f2a4a; --text:#eef1f6; --muted:#a9b3c9;
       --accent:#3b82f6; --accent2:#22c55e; --accent3:#eab308; --accent4:#ef4444;
-      --gap:16px;
-      --chart-h: clamp(220px, 28vh, 360px); /* 화면 높이에 맞춰 차트 높이 반응형 */
-      --card-radius:14px;
+      --gap:16px; --chart-h: clamp(220px, 28vh, 360px); --card-radius:14px;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
@@ -31,17 +30,15 @@
     .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#1e2b52;color:#cfe0ff;font-size:12px}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .grow{flex:1}
-    .chart{height:var(--chart-h)} /* 차트 캔버스 부모 */
+    .chart{height:var(--chart-h)}
     .chart > canvas{width:100% !important;height:100% !important}
     table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
     th,td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;overflow:hidden;text-overflow:ellipsis}
     th{color:#cfe0ff;text-align:left}
     .logs-wrap{max-height:clamp(220px, 34vh, 460px);overflow:auto;border-radius:10px;border:1px solid var(--border)}
-    @media (max-width: 480px){
-      .kpi .num{font-size:32px}
-    }
+    @media (max-width: 480px){ .kpi .num{font-size:32px} }
   </style>
-  <!-- 차트: CDN 그대로/또는 로컬 vendor로 교체 가능 -->
+  <!-- 차트: CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -51,30 +48,18 @@
       <div class="muted">Auto Refresh 10s</div>
     </header>
 
-    <!-- KPI -->
     <section class="kpis" style="margin-bottom:8px">
       <div class="card">
-        <div class="kpi">
-          <div class="num" id="kpiTotal">-</div>
-          <div class="muted">총 중요정보 탐지건수</div>
-        </div>
+        <div class="kpi"><div class="num" id="kpiTotal">-</div><div class="muted">총 중요정보 탐지건수</div></div>
       </div>
       <div class="card">
-        <div class="kpi">
-          <div class="num" id="kpiBlocked">-</div>
-          <div class="muted">총 차단건수</div>
-        </div>
+        <div class="kpi"><div class="num" id="kpiBlocked">-</div><div class="muted">총 차단건수</div></div>
       </div>
       <div class="card">
-        <div class="row">
-          <div class="muted">데이터 소스:</div><div class="badge">sentinel.db</div>
-          <div class="grow"></div>
-          <div class="badge" id="lastRefreshed">-</div>
-        </div>
+        <div class="row"><div class="muted">데이터 소스:</div><div class="badge">sentinel.db</div><div class="grow"></div><div class="badge" id="lastRefreshed">-</div></div>
       </div>
     </section>
 
-    <!-- 메인 차트 2열 -->
     <section class="grid-2" style="margin-bottom:8px">
       <div class="card">
         <div class="title">최근 7일간(시간대) 입력 시도</div>
@@ -86,7 +71,6 @@
       </div>
     </section>
 
-    <!-- 서브 차트 2열 -->
     <section class="grid-2" style="margin-bottom:8px">
       <div class="card">
         <div class="title">중요정보 유형 비율</div>
@@ -98,7 +82,6 @@
       </div>
     </section>
 
-    <!-- 로그 -->
     <section class="grid">
       <div class="card">
         <div class="title">실시간 탐지 로그 (최근 20건)</div>
@@ -124,7 +107,7 @@
     </section>
   </div>
 
-  <!-- 개발 중 CDN 유지. 운영에선 로컬: /dashboard/static/vendor/chart.umd.min.js -->
+  <!-- 앱 스크립트: 정적은 /dashboard/* -->
   <script src="/dashboard/app.js"></script>
 </body>
 </html>

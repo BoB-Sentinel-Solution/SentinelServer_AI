@@ -5,7 +5,6 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from routers.logs import router as logs_router
@@ -15,20 +14,18 @@ from routers.dashboard_api import router as dashboard_router
 from services.ai_detector import init_from_env
 
 BASE_DIR = Path(__file__).resolve().parent
-DASHBOARD_DIR = BASE_DIR / "dashboard"          # 빌드 산출물(index.html, assets/*)
+DASHBOARD_DIR = BASE_DIR / "dashboard"  # index.html, app.js, vendor/*
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # AI 감지기: USE_AI_DETECTOR=true면 부팅 시 1회 로드 (GPU 고정 실패 시 경고만)
+    # USE_AI_DETECTOR=true 면 GPU 모델 선로딩 (실패해도 서버는 뜸)
     if os.getenv("USE_AI_DETECTOR", "true").lower() in ("1", "true", "yes"):
         try:
             init_from_env()
-            print("[INFO] AI detector initialized from env (MODEL_DIR, MAX_NEW_TOKENS).")
+            print("[INFO] AI detector initialized from env.")
         except Exception as e:
-            # 서버는 뜨되, 탐지는 안전폴백(빈 결과)로 동작
             print(f"[WARN] AI detector init failed: {e!r}")
     yield
-    # teardown 없음
 
 app = FastAPI(
     title="Sentinel Solution Server",
@@ -36,46 +33,37 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ---------------------------
-# 정적/대시보드 (SPA)
-# ---------------------------
-# 1) /dashboard 에 정적 자산+index.html 서빙
-#    - html=True 로 index.html 자동 서빙
+# ---------- 정적/대시보드 (SPA) ----------
+# /dashboard 경로에 정적 자산 + index.html 자동 서빙
 app.mount(
     "/dashboard",
     StaticFiles(directory=DASHBOARD_DIR, html=True),
     name="dashboard",
 )
 
-# ---------------------------
-# API 라우터
-# ---------------------------
-app.include_router(logs_router)
-app.include_router(dashboard_router)
+# ---------- API 라우터 ----------
+# ★ 핵심: API는 /api 로 분리 (정적과 충돌 방지)
+app.include_router(logs_router,      prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
 
-# ---------------------------
-# 보안 헤더(클릭재킹/스니핑/XSS 완화)
-# ---------------------------
+# ---------- 보안 헤더 ----------
 @app.middleware("http")
 async def security_headers(req: Request, call_next):
     resp: Response = await call_next(req)
-    # 클릭재킹 방지
     resp.headers.setdefault("X-Frame-Options", "DENY")
-    # MIME 스니핑 방지
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
-    # 최소 리퍼러
     resp.headers.setdefault("Referrer-Policy", "no-referrer")
 
+    # CDN(jsdelivr) 허용. API는 동일 오리진(/api)만 호출
     resp.headers.setdefault(
         "Content-Security-Policy",
         "default-src 'self'; "
         "script-src 'self' https://cdn.jsdelivr.net; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "  # ← inline style 허용(임시)
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "img-src 'self' data:; "
-        "connect-src 'self' https://cdn.jsdelivr.net; "                # ← jsdelivr sourcemap 허용
+        "connect-src 'self'; "
         "frame-ancestors 'none'"
     )
-
-    # HSTS: 신뢰 인증서(Let's Encrypt) 적용 후 활성화 권장
+    # 신뢰 인증서 안정화 후 HSTS 활성 권장:
     # resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
     return resp

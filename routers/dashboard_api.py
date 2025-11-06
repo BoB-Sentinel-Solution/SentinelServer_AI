@@ -1,28 +1,23 @@
 # routers/dashboard_api.py
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Dict, List, Any
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from db import SessionLocal, Base, engine
 from models import LogRecord
 from config import settings
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-DASHBOARD_DIR = BASE_DIR / "dashboard"
+router = APIRouter()  # 접두는 app.py에서 prefix="/api"로 부여
 
-router = APIRouter()
-
-# 안전하게 테이블 생성(운영은 Alembic 권장)
+# 운영에서는 Alembic 권장. 개발 편의를 위해 안전 생성.
 Base.metadata.create_all(bind=engine)
 
-
-# --- DB DI -----------------------------------------------------------
+# --- DB 세션 DI ---
 def get_db():
     db = SessionLocal()
     try:
@@ -34,12 +29,11 @@ def get_db():
     finally:
         db.close()
 
-
-# --- 인증(선택) ------------------------------------------------------
+# --- 선택적 API 키 인증 ---
 def require_admin(x_admin_key: str | None = Header(default=None)):
     """
-    - .env의 DASHBOARD_API_KEY 가 설정되어 있으면 X-Admin-Key 헤더 검증
-    - 미설정이면 무인증 허용(기존과 동일)
+    - .env 의 DASHBOARD_API_KEY 가 설정되어 있다면 X-Admin-Key 헤더로 검증
+    - 없으면 무인증 허용
     """
     if settings.DASHBOARD_API_KEY:
         if x_admin_key != settings.DASHBOARD_API_KEY:
@@ -48,40 +42,19 @@ def require_admin(x_admin_key: str | None = Header(default=None)):
                 detail="Invalid API key",
             )
 
-
-# --- 정적 페이지 -----------------------------------------------------
-# HEAD 허용
-@router.api_route("/dashboard/", methods=["GET", "HEAD"])
-def dashboard_index():
-    """ /dashboard/ → 정적 index.html """
-    index = DASHBOARD_DIR / "index.html"
-    if not index.exists():
-        return JSONResponse({"error": "dashboard not installed"}, status_code=404)
-    return FileResponse(index)
-
-
-# HEAD 허용
-@router.api_route("/dashboard", methods=["GET", "HEAD"])
-def dashboard_redirect_root():
-    """ /dashboard → /dashboard/ 로 정규화 """
-    return RedirectResponse(url="/dashboard/")
-
-
-# --- 요약 API --------------------------------------------------------
-@router.get("/dashboard/api/summary", dependencies=[Depends(require_admin)])
+# ---------- 요약 API ----------
+@router.get("/summary", dependencies=[Depends(require_admin)])
 def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """
-    대시보드 데이터 한 번에 제공
-    - total_sensitive: 중요정보 탐지 총 건수(has_sensitive=True)
-    - type_ratio: 엔티티 라벨 비율(EMAIL, PHONE, PASSWORD, USERNAME, CARD_NO, 기타)
-    - type_blocked: 유형별 차단 횟수(파일유사 차단은 FILE_SIMILAR로 집계)
-    - hourly_attempts: 0~23시 장바구니
-    - recent_logs: 최근 20건 (XSS 완화 위해 엔티티 value 미노출)
-    - ip_band_blocked: 공인IP /16 대역별 차단 건수 (예: '203.0.*')
+    대시보드 요약 데이터:
+    - total_sensitive: has_sensitive=True 총 건수
+    - type_ratio: 라벨 비율(엔티티 라벨 카운트)
+    - type_blocked: 유형별 차단 횟수(파일 유사 차단은 FILE_SIMILAR)
+    - hourly_attempts: 0~23시 카운트
+    - recent_logs: 최근 20건 (민감값 미노출)
+    - ip_band_blocked: 공인IP /16 대역별 차단 건수 (e.g., '203.0.*')
     """
-    rows: List[LogRecord] = (
-        db.query(LogRecord).order_by(LogRecord.created_at.desc()).all()
-    )
+    rows: List[LogRecord] = db.query(LogRecord).order_by(LogRecord.created_at.desc()).all()
 
     total_sensitive = 0
     type_ratio: Dict[str, int] = defaultdict(int)
@@ -91,7 +64,7 @@ def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
     ip_band_blocked: Dict[str, int] = defaultdict(int)
 
     for r in rows:
-        # 총 중요정보 탐지 건수/비율
+        # 중요정보 탐지 건수 / 비율
         if r.has_sensitive:
             total_sensitive += 1
             for e in (r.entities or []):
@@ -117,7 +90,7 @@ def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
             except Exception:
                 pass
 
-        # 최근 로그 20건 (민감값(value) 미노출, label만)
+        # 최근 로그 20건 (민감값 미노출)
         if len(recent_logs) < 20:
             recent_logs.append({
                 "time": r.created_at.isoformat() if r.created_at else r.time,

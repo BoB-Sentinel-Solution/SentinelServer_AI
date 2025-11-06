@@ -47,15 +47,6 @@ app.mount(
     name="dashboard",
 )
 
-# 2) SPA 딥링크 폴백:
-#    /dashboard/* 로 직접 접근 시 index.html 반환 (StaticFiles(html=True)로 대부분 커버되지만 보강)
-@app.get("/dashboard/{path:path}")
-async def dashboard_fallback(path: str):
-    index_file = DASHBOARD_DIR / "index.html"
-    if index_file.is_file():
-        return FileResponse(index_file)
-    return Response(status_code=404, content="dashboard not found")
-
 # ---------------------------
 # API 라우터
 # ---------------------------

@@ -14,7 +14,9 @@ from services.attachment import save_attachment_file
 from services.similarity import best_similarity_against_folder
 from repositories.log_repo import LogRepository
 
-# 외부 판별기 러너
+# 1) 정규식 1차 감지기
+from services.regex_detector import detect_entities as regex_detect
+# 2) 외부 판별기 러너(offline_sensitive_detector_min.py 호출)
 from services.ai_external import OfflineDetectorRunner
 
 ADMIN_IMAGE_DIR = Path("./SentinelServer_AI/adminset/image")
@@ -26,23 +28,45 @@ _DETECTOR = OfflineDetectorRunner(
     timeout_sec=20.0,
 )
 
-def _to_labeled_spans(text: str, entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _rebase_ai_entities_on_original(original: str, ai_ents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    ai_external의 결과( type/value/(begin/end) )를
-    서버 공통 스키마(label/value/begin/end)로 매핑.
+    AI가 마스킹된 프롬프트에서 잡아낸 {type/value}를
+    '원문(original)'에서 다시 찾아 begin/end를 붙여 반환.
+    (값이 원문에 없으면 스킵)
     """
     out: List[Dict[str, Any]] = []
-    for e in entities:
-        t = e.get("type") or e.get("label")
-        v = e.get("value")
-        if not isinstance(t, str) or not isinstance(v, str) or not v.strip():
+    cursor = 0
+    for e in ai_ents:
+        label = (e.get("type") or e.get("label") or "").strip().upper()
+        value = (e.get("value") or "").strip()
+        if not label or not value:
             continue
-        item: Dict[str, Any] = {"label": t.strip().upper(), "value": v.strip()}
-        b = e.get("begin"); en = e.get("end")
-        if isinstance(b, int) and isinstance(en, int):
-            item["begin"] = b
-            item["end"] = en
-        out.append(item)
+        idx = original.find(value, cursor)
+        if idx < 0:
+            idx = original.find(value)
+            if idx < 0:
+                continue
+        b, en = idx, idx + len(value)
+        cursor = en
+        out.append({"label": label, "value": value, "begin": b, "end": en})
+    return out
+
+def _dedup_spans(base: List[Dict[str, Any]], extra: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    스팬 중복 제거: base 우선, extra는 같은 라벨에서 겹치면 버림.
+    (완전 동일 스팬이거나 라벨 동일 & 구간 겹치면 스킵)
+    """
+    out = list(base)
+    for e in extra:
+        eb, ee, el = e["begin"], e["end"], e["label"]
+        conflict = False
+        for x in out:
+            xb, xe, xl = x["begin"], x["end"], x["label"]
+            if (eb == xb and ee == xe) or (el == xl and not (ee <= xb or xe <= eb)):
+                conflict = True
+                break
+        if not conflict:
+            out.append(e)
     return out
 
 
@@ -72,32 +96,46 @@ class DbLoggingService:
         # 2) OCR
         ocr_text, ocr_used, _ = OcrService.run_ocr(item)
 
-        # 3) AI 감지 (프롬프트 / OCR) — 외부 판별기 호출
+        # 3) 정규식 1차 감지 (원문 기준 스팬 확보)
         prompt_text = item.prompt or ""
+        regex_ents_prompt = []
         try:
-            det_prompt = _DETECTOR.analyze_text(prompt_text, return_spans=True)
+            regex_ents_prompt = regex_detect(prompt_text)  # [{label,value,begin,end}, ...]
         except Exception:
-            det_prompt = {"has_sensitive": False, "entities": [], "processing_ms": 0}
+            regex_ents_prompt = []
 
-        prompt_entities_raw = det_prompt.get("entities", []) or []
-        prompt_entities = _to_labeled_spans(prompt_text, prompt_entities_raw)
+        # 4) 1차 마스킹(정규식 결과 반영)
+        #   - Entity 스키마로 변환 후 치환
+        masked_after_regex = mask_by_entities(
+            prompt_text,
+            [Entity(**e) for e in regex_ents_prompt if set(e).issuperset({"label","value","begin","end"})]
+        )
 
-        det_ocr_ms = 0
-        ocr_entities: List[Dict[str, Any]] = []
+        # (선택) OCR 텍스트에도 정규식 적용 (DB 저장은 프롬프트만)
+        regex_ents_ocr: List[Dict[str, Any]] = []
         if ocr_used and ocr_text:
             try:
-                det_ocr = _DETECTOR.analyze_text(ocr_text, return_spans=True)
-                ocr_entities_raw = det_ocr.get("entities", []) or []
-                ocr_entities = _to_labeled_spans(ocr_text, ocr_entities_raw)
-                det_ocr_ms = int(det_ocr.get("processing_ms", 0) or 0)
+                regex_ents_ocr = regex_detect(ocr_text)
             except Exception:
-                ocr_entities = []
-                det_ocr_ms = 0
+                regex_ents_ocr = []
 
-        has_sensitive = bool(det_prompt.get("has_sensitive") or ocr_entities)
-        ai_ms = int(det_prompt.get("processing_ms", 0) or 0) + det_ocr_ms
+        # 5) AI 보완 탐지 (마스킹된 프롬프트 대상)
+        #    - offline_sensitive_detector_min.py 의 JSON 출력: {"has_sensitive": bool, "entities":[{"type","value"}]}
+        try:
+            det_ai = _DETECTOR.analyze_text(masked_after_regex, return_spans=False)
+        except Exception:
+            det_ai = {"has_sensitive": False, "entities": []}
 
-        # 4) 정책결정 (이미지 유사도 포함)
+        ai_raw_ents = det_ai.get("entities", []) or []
+
+        # 6) AI 결과를 원문 기준 스팬으로 재계산 → 정규식 결과와 병합
+        ai_ents_rebased = _rebase_ai_entities_on_original(prompt_text, ai_raw_ents)
+        prompt_entities = _dedup_spans(regex_ents_prompt, ai_ents_rebased)
+
+        # OCR에서 정규식으로 잡힌 것들도 민감도 판정에 반영(표시는 프롬프트만)
+        has_sensitive = bool(prompt_entities or regex_ents_ocr)
+
+        # 7) 정책결정 (이미지 유사도 포함)
         file_blocked = False
         allow = True
         action = "mask_and_allow" if prompt_entities else "allow"
@@ -118,37 +156,33 @@ class DbLoggingService:
             except Exception:
                 pass
 
-        # 5) 마스킹(프롬프트만)
-        masked_entities: List[Entity] = []
-        for e in prompt_entities:
-            try:
-                masked_entities.append(Entity(**e))
-            except Exception:
-                pass
-
-        modified_prompt = mask_by_entities(prompt_text, masked_entities)
+        # 8) 최종 마스킹(정규식 + AI 보완 엔티티 모두 반영)
+        final_modified_prompt = mask_by_entities(
+            prompt_text,
+            [Entity(**e) for e in prompt_entities if set(e).issuperset({"label","value","begin","end"})]
+        )
 
         # 전체 처리시간
-        processing_ms = max(int((time.perf_counter() - t0) * 1000), ai_ms)
+        processing_ms = int((time.perf_counter() - t0) * 1000)
 
         # hostname 우선, 없으면 pc_name 대체 (schemas가 별칭 처리)
         host_name = item.hostname or item.pc_name
 
-        # 6) DB 저장
+        # 9) DB 저장 (프롬프트 엔티티만 저장)
         rec = LogRecord(
             request_id      = request_id,
             time            = item.time,
             public_ip       = item.public_ip,
             private_ip      = item.private_ip,
             host            = item.host or "unknown",
-            hostname        = host_name,                 # ← 컬럼명 정확히 'hostname'
+            hostname        = host_name,  # 컬럼명: hostname
             prompt          = prompt_text,
             attachment      = DbLoggingService._serialize_attachment(item.attachment),
             interface       = item.interface or "llm",
 
-            modified_prompt = modified_prompt,
+            modified_prompt = final_modified_prompt,
             has_sensitive   = has_sensitive,
-            entities        = [dict(e) for e in prompt_entities],  # 프롬프트 엔티티만 저장
+            entities        = [dict(e) for e in prompt_entities],
             processing_ms   = processing_ms,
 
             file_blocked    = file_blocked,
@@ -157,7 +191,7 @@ class DbLoggingService:
         )
         LogRepository.create(db, rec)
 
-        # 7) 응답
+        # 10) 응답
         return ServerOut(
             request_id      = request_id,
             host            = rec.host,

@@ -41,5 +41,22 @@ ReadWritePaths=${APP_DST}
 StandardOutput=journal
 StandardError=journal
 
+# === HF/Transformers 캐시 디렉터리 준비 (쓰기 가능 경로) ===
+# ProtectHome=read-only라 /root/.cache 사용 불가 → /var/cache/sentinel/hf 사용
+ExecStartPre=/usr/bin/mkdir -p /var/cache/sentinel/hf
+ExecStartPre=/usr/bin/chown ${RUN_USER}:${RUN_GROUP} /var/cache/sentinel/hf
+
+# === 런타임 환경변수 (캐시/오프라인/GPU 고정/성능) ===
+Environment=TRANSFORMERS_CACHE=/var/cache/sentinel/hf
+Environment=HF_HUB_OFFLINE=1
+Environment=TRANSFORMERS_OFFLINE=1
+Environment=TOKENIZERS_PARALLELISM=false
+Environment=CUDA_VISIBLE_DEVICES=0
+Environment=PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+# === systemd 샌드박스에서 쓰기 허용 경로 추가 ===
+ReadWritePaths=${APP_DST}
+ReadWritePaths=/var/cache/sentinel/hf
+
 [Install]
 WantedBy=multi-user.target

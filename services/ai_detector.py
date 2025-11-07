@@ -110,14 +110,23 @@ def _extract_json(s: str) -> Dict[str, Any]:
 
 class _Detector:
     def __init__(self, model_dir: str, max_new_tokens: int = 256):
-        # 로컬 전용 로딩(네트워크 미접속)
+        # 로컬 전용 로딩(네트워크 미접속) + Bandit B615 완화
+        revision = os.getenv("MODEL_REVISION", "").strip() or None
+        allow_trc = (os.getenv("ALLOW_TRUST_REMOTE_CODE", "").strip() == "1")
+
+        common_kwargs = dict(
+            local_files_only=True,
+            trust_remote_code=allow_trc,   # 꼭 필요한 모델에서만 True
+        )
+        if revision:
+            common_kwargs["revision"] = revision  # HF 모델 ID 사용 시에만 의미가 있음
+
         self.tok = AutoTokenizer.from_pretrained(
-            model_dir, use_fast=True, local_files_only=True, trust_remote_code=True
-        )
+            model_dir, use_fast=True, **common_kwargs
+        )  # nosec B615: local path or pinned
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_dir, device_map="auto", torch_dtype="auto",
-            local_files_only=True, trust_remote_code=True
-        )
+            model_dir, device_map="auto", torch_dtype="auto", **common_kwargs
+        )  # nosec B615: local path or pinned
         self.model.eval()
 
         if self.tok.pad_token is None:

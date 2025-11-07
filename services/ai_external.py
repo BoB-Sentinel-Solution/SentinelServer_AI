@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # ai_external.py
 from __future__ import annotations
-import os, json, shlex, subprocess, re
+import os, json, shlex, re
 from typing import Any, Dict, List, Optional, Tuple
+import subprocess  # nosec B404  # shell=False + 인자리스트만 사용(검증된 입력)
 
 # ---- JSON 추출 유틸 (stdout에 경고/로그가 섞여도 OK) ----
 _CODE_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
@@ -132,16 +133,23 @@ class OfflineDetectorRunner:
         {"has_sensitive": bool, "entities":[{"type","value"(, begin,end)}]} 형태로 반환.
         실패 시 안전 폴백.
         """
-        # 경고가 섞여 나와도 OK: 우리는 stdout 전체에서 '마지막 최상위 JSON'만 파싱
-        cmd = (
-            f"{shlex.quote(self.python_bin)} {shlex.quote(self.script_path)} "
-            f"--model_dir {shlex.quote(self.model_dir)} "
-            f"--text {shlex.quote(text)} "
-            f"--max_new_tokens {int(self.max_new_tokens)}"
-        )
+        # NOTE: Bandit B602 대응 — shell=False + 인자리스트 사용
+        args = [
+            self.python_bin,
+            self.script_path,
+            "--model_dir", self.model_dir,
+            "--text", text,
+            "--max_new_tokens", str(int(self.max_new_tokens)),
+        ]
+
         try:
-            proc = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=self.timeout_sec
+            proc = subprocess.run(  # nosec B603 (인자리스트+shell=False)
+                args,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout_sec,
+                check=False,
             )
         except subprocess.TimeoutExpired:
             return {"has_sensitive": False, "entities": [], "error": "timeout"}
@@ -159,14 +167,19 @@ class OfflineDetectorRunner:
         # 최소 스키마 정리
         has = bool(parsed.get("has_sensitive"))
         ents = parsed.get("entities") or []
-        # 정합성: type/value 문자열만 남기기
+
         clean: List[Dict[str, Any]] = []
         for e in ents:
             if not isinstance(e, dict):
                 continue
             t = e.get("type"); v = e.get("value")
-            if isinstance(t, str) and isinstance(v, str) and t.strip() and v.strip():
-                clean.append({"type": t.strip().upper(), "value": v.strip()})
+            if isinstance(t, str) and isinstance(v, str):
+                t = t.strip().upper()
+                v = v.strip()
+                if t and v:
+                    clean.append({"type": t, "value": v})
+
         if return_spans and clean:
             clean = _add_spans(text, clean)
+
         return {"has_sensitive": bool(clean) if has or clean else False, "entities": clean}

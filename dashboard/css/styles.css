@@ -199,9 +199,9 @@
 
 /* 대시보드 레이아웃 */
 .dashboard-layout {
-  max-width: 1200px;
+  max-width: 1400px;         /* 기존 1200 → 좀 더 넓게 */
   margin: 20px auto 32px;
-  padding: 0 12px;
+  padding: 0 24px;           /* 좌우 여백 조금 더 */
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -209,8 +209,9 @@
 
 .dashboard-main {
   display: grid;
-  grid-template-columns: 2fr 2fr;
+  grid-template-columns: 3fr 2.7fr;  /* 비율 조금 조정 */
   gap: 18px;
+  align-items: flex-start;
 }
 
 .dashboard-col {
@@ -422,6 +423,11 @@
 
 /* 반응형 */
 @media (max-width: 900px) {
+  .dashboard-layout {
+    max-width: 100%;
+    padding: 0 12px;
+  }
+
   .login-layout {
     grid-template-columns: 1fr;
     border-radius: 0;
@@ -440,4 +446,26 @@
   .card-body-today {
     grid-template-columns: 1fr;
   }
+}
+
+/* 차트 높이 조정: 세로로 너무 길어지지 않도록 제한 */
+.card canvas {
+  display: block;
+  max-height: 220px;
+}
+
+/* TODAY 카드 안의 차트는 조금 더 낮게 */
+.card-today canvas {
+  max-height: 160px;
+}
+
+/* 캔버스 컨테이너가 카드 안에서 꽉 차도록 */
+.card {
+  display: flex;
+  flex-direction: column;
+}
+
+.card canvas {
+  margin-top: 8px;
+  flex: 1 0 auto;
 }

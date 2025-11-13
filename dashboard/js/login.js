@@ -23,15 +23,16 @@ document.addEventListener("DOMContentLoaded", () => {
       // 비밀번호를 관리자 키로 사용
       window.SentinelApi.setAdminKey(password);
 
-      // 간단한 확인용으로 summary 호출 (실패하면 키 오류로 간주)
-      await window.SentinelApi.get("/dashboard/summary");
+      // ★ 요약 API는 /api/summary 이므로 여기서는 "/summary" 호출
+      await window.SentinelApi.get("/summary");
 
       // 성공 시 대시보드로 이동
       window.location.href = "./dashboard.html";
     } catch (err) {
       console.error(err);
       window.SentinelApi.setAdminKey("");
-      errorEl.textContent = "로그인 실패: 관리자 키가 올바르지 않거나 서버에 접근할 수 없습니다.";
+      errorEl.textContent =
+        "로그인 실패: 관리자 키가 올바르지 않거나 서버에 접근할 수 없습니다.";
       errorEl.hidden = false;
     }
   });

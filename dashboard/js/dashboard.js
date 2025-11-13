@@ -43,12 +43,14 @@ document.addEventListener("DOMContentLoaded", () => {
         "0"
       )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
         now.getSeconds()
-      ).padStart(2, "0")}`;
+      ).padStart(2,
+      "0")}`;
     }
   }
 
   async function loadSummary() {
-    const summary = await window.SentinelApi.get("/dashboard/summary");
+    // ★ 여기도 /summary 로 호출
+    const summary = await window.SentinelApi.get("/summary");
 
     // 1) KPI
     if (kpiTotalSensitive) {
@@ -56,7 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
         summary.total_sensitive != null ? summary.total_sensitive : "-";
     }
     if (kpiTotalBlocked) {
-      // 기존 구조에 따라 total_blocked 또는 type_blocked 합산
       if (summary.total_blocked != null) {
         kpiTotalBlocked.textContent = summary.total_blocked;
       } else if (summary.type_blocked) {
@@ -209,12 +210,12 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // 7) 시간대별 유형 (stacked bar 등 심플 버전)
+    // 7) 시간대별 유형 (stacked bar)
     const ctxHourlyType = document
       .getElementById("chart-hourly-type")
       ?.getContext("2d");
     if (ctxHourlyType && summary.hourly_type) {
-      const hours = Object.keys(summary.hourly_type); // "00", "01" ...
+      const hours = Object.keys(summary.hourly_type); // "00","01",...
       const typeNames = new Set();
       hours.forEach((h) => {
         Object.keys(summary.hourly_type[h]).forEach((t) => typeNames.add(t));
@@ -255,7 +256,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const publicIp = log.public_ip || "-";
         const internalIp = log.internal_ip || "-";
         const action = log.action || "-";
-        const blocked = log.allow === false || log.action === "block" ? "Y" : "N";
+        const blocked =
+          log.allow === false || log.action === "block" ? "Y" : "N";
         const labels =
           (log.entities || [])
             .map((e) => e.label || e.type)

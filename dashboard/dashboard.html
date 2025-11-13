@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel Dashboard</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body class="sentinel-body">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item top-menu-item--active">Dashboard</a>
+          <a class="top-menu-item" href="#">Report</a>
+          <a class="top-menu-item" href="#">Logs</a>
+          <a class="top-menu-item" href="#">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <!-- 메인 컨텐츠 -->
+    <main class="dashboard-layout">
+      <!-- 상단 KPI 2개 -->
+      <section class="kpi-row">
+        <div class="card kpi-card">
+          <div class="kpi-label">중요 정보 탐지 건수</div>
+          <div id="kpi-total-sensitive" class="kpi-value">-</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-label">총 차단 건수</div>
+          <div id="kpi-total-blocked" class="kpi-value">-</div>
+        </div>
+      </section>
+
+      <!-- 좌/우 2컬럼 레이아웃 -->
+      <section class="dashboard-main">
+        <!-- 왼쪽 컬럼 -->
+        <div class="dashboard-col">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">최근 개인정보(식별대상) 입력 시도 횟수</h3>
+            </div>
+            <canvas id="chart-recent-attempts" height="150"></canvas>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">IP 대역별 탐지 건수</h3>
+            </div>
+            <canvas id="chart-ip-band" height="150"></canvas>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">탐지된 중요 정보 유형 비율</h3>
+            </div>
+            <canvas id="chart-type-ratio" height="180"></canvas>
+          </div>
+        </div>
+
+        <!-- 오른쪽 컬럼 -->
+        <div class="dashboard-col dashboard-col--right">
+          <div class="card card-today">
+            <div class="card-header card-header--today">
+              <div>
+                <div class="badge">TODAY'S DETECTION</div>
+                <div class="today-metrics">
+                  <span><strong id="today-detected">-</strong> 중요정보 탐지</span>
+                  <span><strong id="today-blocked">-</strong> 차단</span>
+                </div>
+              </div>
+              <div class="today-date">
+                <div id="today-date">--/--</div>
+                <div id="today-time">--:--:--</div>
+              </div>
+            </div>
+
+            <div class="card-body-today">
+              <div class="card-today-chart">
+                <h4 class="card-subtitle">금일 시간대별 탐지 건수</h4>
+                <canvas id="chart-today-hourly" height="120"></canvas>
+              </div>
+              <div class="card-today-chart">
+                <h4 class="card-subtitle">금일 탐지된 중요 정보 유형 비율</h4>
+                <canvas id="chart-today-type" height="160"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">시간대별 중요 정보 탐지 유형</h3>
+            </div>
+            <canvas id="chart-hourly-type" height="160"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- 하단 로그 테이블 -->
+      <section class="card card-table">
+        <div class="card-header">
+          <h3 class="card-title">실시간 탐지 로그 상위 10건</h3>
+          <span class="card-subtitle">가장 최근에 탐지된 요청 기준</span>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Host</th>
+                <th>PC Name</th>
+                <th>Public IP</th>
+                <th>Internal IP</th>
+                <th>Action</th>
+                <th>차단 여부</th>
+                <th>Entity</th>
+              </tr>
+            </thead>
+            <tbody id="log-table-body">
+              <!-- JS에서 채움 -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/dashboard.js"></script>
+  </body>
+</html>

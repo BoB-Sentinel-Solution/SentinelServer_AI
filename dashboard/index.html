@@ -1,259 +1,91 @@
-<!-- dashboard/index.html -->
 <!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="utf-8" />
-  <title>Sentinel Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- reset -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset/dist/reset.min.css">
-  <style>
-    :root{
-      --bg:#0b1020; --card:#121a36; --border:#1f2a4a; --text:#eef1f6; --muted:#a9b3c9;
-      --gap:16px; --chart-h: clamp(220px, 28vh, 360px); --card-radius:14px;
-      --tip-bg:#0f1733; --tip-border:#2a3a72; --tip-text:#eaf0ff;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-    .wrap{max-width:1280px;margin:24px auto;padding:0 16px}
-    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-    h1{font-size:28px;margin:0}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:var(--gap)}
-    .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:var(--gap)}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--card-radius);padding:16px;min-width:0}
-    .title{font-weight:600;margin-bottom:8px}
-    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--gap)}
-    .kpi{display:flex;align-items:center;gap:12px}
-    .kpi .num{font-size:40px;font-weight:800;line-height:1}
-    .muted{color:var(--muted)}
-    .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#1e2b52;color:#cfe0ff;font-size:12px}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .grow{flex:1}
-    .chart{height:var(--chart-h)}
-    .chart > canvas{width:100% !important;height:100% !important}
-    table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
-    th,td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;overflow:hidden;text-overflow:ellipsis}
-    th{color:#cfe0ff;text-align:left}
-    .logs-wrap{max-height:clamp(220px, 34vh, 460px);overflow:auto;border-radius:10px;border:1px solid var(--border)}
-    @media (max-width: 480px){ .kpi .num{font-size:32px} }
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel Solution - Admin Login</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-    /* ====== CSS-only 팝오버(details/summary) ====== */
-    .head-ctl{ position:relative; display:flex; align-items:center; gap:8px }
-    .popover-details{ position:relative; }
-    .popover-summary{
-      list-style:none; cursor:pointer;
-      width:28px; height:28px; border-radius:50%;
-      display:inline-flex; align-items:center; justify-content:center;
-      background:#1b2450; color:#d8e0ff; border:1px solid var(--border);
-      user-select:none;
-    }
-    .popover-summary::-webkit-details-marker{ display:none; }
-    .popover-panel{
-      position:absolute; right:0; top:36px; z-index:9999;
-      width:520px; max-width:92vw;
-      background:#0a0f1f; color:#eef1f6;
-      border:1px solid var(--border); border-radius:12px;
-      box-shadow:0 10px 40px rgba(0,0,0,.45);
-      padding:12px;
-    }
-    .popover-details:not([open]) .popover-panel{ display:none; }
-    .pop-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
-    .pop-title{font-size:14px;font-weight:700}
+    <!-- 리셋 CSS -->
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
 
-    /* ====== ALLOWED 라벨 툴팁(hover/focus) ====== */
-    .pill{
-      display:inline-block; background:#172042; border:1px solid var(--border);
-      padding:4px 8px; border-radius:999px; margin:3px 6px; font-size:12px;
-      line-height:1; white-space:nowrap;
-    }
-    .tip{ position:relative; outline:none; }
-    .tip:focus-visible{ box-shadow:0 0 0 2px rgba(59,130,246,.6); }
+    <!-- 공통 스타일 -->
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body class="sentinel-body sentinel-body--center">
+    <main class="login-layout">
+      <!-- 왼쪽 브랜드 패널 -->
+      <section class="login-hero">
+        <div class="login-hero-inner">
+          <h1 class="logo-title">Sentinel Solution</h1>
+          <p class="logo-subtitle">
+            Enterprise-grade solution for<br />
+            preventing critical information leakage.
+          </p>
+          <button type="button" class="btn btn-outline" disabled>
+            Learn More Information
+          </button>
 
-    .tip:hover::after, .tip:focus::after{
-      content: attr(data-tip);
-      position:absolute; left:50%; transform:translateX(-50%);
-      bottom: calc(100% + 10px);
-      min-width:220px; max-width:420px;
-      background: var(--tip-bg); color: var(--tip-text);
-      border:1px solid var(--tip-border); padding:10px 12px; border-radius:10px;
-      font-size:12px; line-height:1.5; text-align:left; white-space:normal; z-index:10000;
-    }
-    .tip:hover::before, .tip:focus::before{
-      content:""; position:absolute; left:50%; transform:translateX(-50%); bottom:100%;
-      border-width:8px; border-style:solid; border-color:transparent transparent var(--tip-bg) transparent; z-index:10001;
-    }
-    .grid2{display:grid;grid-template-columns:1fr;gap:10px}
-    @media(min-width:700px){.grid2{grid-template-columns:repeat(2,1fr)}}
-    .sec{border:1px solid var(--border);border-radius:10px;padding:10px}
-    .sec h4{margin:0 0 6px 0;font-size:13px}
-  </style>
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-  <div class="wrap">
-    <header>
-      <h1>Sentinel Dashboard</h1>
-      <div class="head-ctl">
-        <div class="muted">Auto Refresh 10s</div>
-
-        <!-- JS 없는 팝오버 -->
-        <details class="popover-details" aria-label="중요정보 규정">
-          <summary class="popover-summary" title="중요정보 규정 보기">?</summary>
-
-          <div class="popover-panel" role="dialog" aria-live="polite">
-            <div class="pop-header">
-              <div class="pop-title">중요정보 규정 &amp; ALLOWED 유형</div>
-            </div>
-
-            <div class="sec" style="margin-bottom:10px">
-              <h4>정의</h4>
-              <div class="muted" style="line-height:1.5">
-                유출 시 사용자에게 피해가 발생할 수 있는 정보를 ‘중요정보’로 정의합니다.
-                아래 <b>허용 목록(allowlist)</b>에 포함된 라벨만 중요정보로 간주합니다.
-              </div>
-            </div>
-
-            <div class="grid2">
-              <!-- 기본 신원 정보 -->
-              <div class="sec">
-                <h4>기본 신원 정보</h4>
-                <div>
-                  <span class="pill tip" tabindex="0" data-tip="개인을 식별할 수 있는 법적 풀네임 또는 명확히 특정 가능한 이름.">NAME</span>
-                  <span class="pill tip" tabindex="0" data-tip="개인 또는 조직의 유효한 전화번호 형식 전체.">PHONE</span>
-                  <span class="pill tip" tabindex="0" data-tip="특정 우편함을 식별하는 이메일 주소.">EMAIL</span>
-                  <span class="pill tip" tabindex="0" data-tip="현실의 특정 위치를 나타내는 우편/거소 주소(도로명·지번·상세 포함 가능).">ADDRESS</span>
-                  <span class="pill tip" tabindex="0" data-tip="우편물 배송을 위한 우편번호/ZIP 코드.">POSTAL_CODE</span>
-                </div>
-              </div>
-
-              <!-- 공적 식별번호 -->
-              <div class="sec">
-                <h4>공적 식별번호</h4>
-                <div>
-                  <span class="pill tip" tabindex="0" data-tip="수입·수출을 위해 발급되는 개인통관고유번호.">PERSONAL_CUSTOMS_ID</span>
-                  <span class="pill tip" tabindex="0" data-tip="개인을 고유하게 식별하는 주민등록번호.">RESIDENT_ID</span>
-                  <span class="pill tip" tabindex="0" data-tip="정부가 발급하는 여권 번호.">PASSPORT</span>
-                  <span class="pill tip" tabindex="0" data-tip="운전면허 발급기관이 부여한 면허번호.">DRIVER_LICENSE</span>
-                  <span class="pill tip" tabindex="0" data-tip="정부가 부여하는 외국인등록번호.">FOREIGNER_ID</span>
-                  <span class="pill tip" tabindex="0" data-tip="공·사보험 가입과 연계된 건강보험 증번호.">HEALTH_INSURANCE_ID</span>
-                  <span class="pill tip" tabindex="0" data-tip="정부가 부여하는 사업자(법인) 등록번호.">BUSINESS_ID</span>
-                  <span class="pill tip" tabindex="0" data-tip="군 복무자에게 부여되는 군 식별 번호.">MILITARY_ID</span>
-                </div>
-              </div>
-
-              <!-- 인증 정보 -->
-              <div class="sec">
-                <h4>인증 정보</h4>
-                <div>
-                  <span class="pill tip" tabindex="0" data-tip="인증/인가에 사용되는 JSON Web Token 문자열.">JWT</span>
-                  <span class="pill tip" tabindex="0" data-tip="서비스에서 발급하는 API 접근 자격증명.">API_KEY</span>
-                  <span class="pill tip" tabindex="0" data-tip="GitHub 리포지토리/API 권한을 부여하는 개인 액세스 토큰.">GITHUB_PAT</span>
-                  <span class="pill tip" tabindex="0" data-tip="SSH/TLS/PGP 등 암호학적 개인키 문자열.">PRIVATE_KEY</span>
-                </div>
-              </div>
-
-              <!-- 금융 정보 -->
-              <div class="sec">
-                <h4>금융 정보</h4>
-                <div>
-                  <span class="pill tip" tabindex="0" data-tip="결제에 사용되는 카드 기본 계정 번호(PAN).">CARD_NUMBER</span>
-                  <span class="pill tip" tabindex="0" data-tip="결제 카드의 유효기간을 나타내는 값(MM/YY 등).">CARD_EXPIRY</span>
-                  <span class="pill tip" tabindex="0" data-tip="자금 이체에 사용되는 은행 계좌 식별자.">BANK_ACCOUNT</span>
-                  <span class="pill tip" tabindex="0" data-tip="비대면 결제 검증에 쓰이는 카드 보안 코드(CVC/CVV).">CARD_CVV</span>
-                  <span class="pill tip" tabindex="0" data-tip="은행/카드 이용 시 사용하는 4자리 개인 비밀번호(PIN).">PAYMENT_PIN</span>
-                  <span class="pill tip" tabindex="0" data-tip="모바일 결제를 승인하기 위한 6자리 PIN.">MOBILE_PAYMENT_PIN</span>
-                </div>
-              </div>
-
-              <!-- 가상화폐 정보 -->
-              <div class="sec">
-                <h4>가상화폐 정보</h4>
-                <div>
-                  <span class="pill tip" tabindex="0" data-tip="지갑 키를 유도하기 위해 사용되는 순서 있는 시드 문구(니모닉).">MNEMONIC</span>
-                  <span class="pill tip" tabindex="0" data-tip="가상자산 접근·이체를 통제하는 개인키.">CRYPTO_PRIVATE_KEY</span>
-                  <span class="pill tip" tabindex="0" data-tip="계층적 결정형(HD) 지갑의 확장 키(비공개/공개).">HD_WALLET</span>
-                  <span class="pill tip" tabindex="0" data-tip="BTC/ETH/XRP/SOL/TRON 등 주소·금액·메모 등을 담는 결제 URI/QR.">PAYMENT_URI_QR</span>
-                </div>
-              </div>
-
-              <!-- 네트워크/기타 -->
-              <div class="sec">
-                <h4>네트워크/기타</h4>
-                <div>
-                  <span class="pill tip" tabindex="0" data-tip="네트워크 상의 호스트를 식별하는 IPv4 주소.">IPV4</span>
-                  <span class="pill tip" tabindex="0" data-tip="네트워크 상의 호스트를 식별하는 IPv6 주소.">IPV6</span>
-                  <span class="pill tip" tabindex="0" data-tip="네트워크 인터페이스의 L2(MAC) 하드웨어 주소.">MAC_ADDRESS</span>
-                  <span class="pill tip" tabindex="0" data-tip="셀룰러 네트워크용 단말 장비 식별 번호.">IMEI</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </details>
-      </div>
-    </header>
-
-    <section class="kpis" style="margin-bottom:8px">
-      <div class="card">
-        <div class="kpi"><div class="num" id="kpiTotal">-</div><div class="muted">총 중요정보 탐지건수</div></div>
-      </div>
-      <div class="card">
-        <div class="kpi"><div class="num" id="kpiBlocked">-</div><div class="muted">총 차단건수</div></div>
-      </div>
-      <div class="card">
-        <div class="row"><div class="muted">데이터 소스:</div><div class="badge">sentinel.db</div><div class="grow"></div><div class="badge" id="lastRefreshed">-</div></div>
-      </div>
-    </section>
-
-    <section class="grid-2" style="margin-bottom:8px">
-      <div class="card">
-        <div class="title">최근 7일간(시간대) 입력 시도</div>
-        <div class="chart"><canvas id="chartHourly"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="title">중요정보 유형별 탐지 횟수</div>  <!-- ← 여기 변경 -->
-        <div class="chart"><canvas id="chartDetected"></canvas></div> <!-- id도 chartDetected로 변경 -->
-      </div>
-    </section>
-
-    <section class="grid-2" style="margin-bottom:8px">
-      <div class="card">
-        <div class="title">중요정보 유형 비율</div>
-        <div class="chart"><canvas id="chartRatio"></canvas></div>
-      </div>
-      <div class="card">
-         <div class="title">IP 대역별 탐지 건수</div> <!-- ← 여기 변경 -->
-        <div class="chart"><canvas id="chartIpBand"></canvas></div>
-      </div>
-    </section>
-
-    <section class="grid">
-      <div class="card">
-        <div class="title">실시간 탐지 로그 (최근 20건)</div>
-        <div class="logs-wrap">
-          <table id="logs">
-            <thead>
-              <tr>
-                <th style="width:160px">시간</th>
-                <th style="width:120px">호스트</th>
-                <th style="width:140px">호스트명</th>
-                <th style="width:130px">공인 IP</th>
-                <th style="width:120px">액션</th>
-                <th style="width:70px">민감</th>
-                <th style="width:90px">파일차단</th>
-                <th style="width:140px">엔티티</th>
-                <th>프롬프트</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <p class="login-hero-caption">
+            This dashboard is for Sentinel Server administrators.
+          </p>
         </div>
-      </div>
-    </section>
-  </div>
+      </section>
 
-  <!-- 외부 스크립트 (CSP: 'self' 허용) -->
-  <script src="/dashboard/app.js"></script>
-</body>
+      <!-- 오른쪽 로그인 폼 -->
+      <section class="login-panel">
+        <div class="login-panel-inner">
+          <h2 class="login-title">Hello<br />Again!</h2>
+          <p class="login-desc">
+            This page is the dashboard accessible only to the Sentinel Server administrator.
+          </p>
+
+          <form id="login-form" class="login-form">
+            <label class="form-label">
+              Email address
+              <div class="form-input-wrapper">
+                <span class="form-input-icon">📧</span>
+                <input
+                  type="email"
+                  name="email"
+                  class="form-input"
+                  placeholder="admin@example.com"
+                  autocomplete="username"
+                  required
+                />
+              </div>
+            </label>
+
+            <label class="form-label">
+              Password
+              <div class="form-input-wrapper">
+                <span class="form-input-icon">🔒</span>
+                <input
+                  type="password"
+                  name="password"
+                  class="form-input"
+                  placeholder="Admin API key or password"
+                  autocomplete="current-password"
+                  required
+                />
+              </div>
+            </label>
+
+            <p class="login-hint">
+              * 현재 버전에서는 비밀번호를 Sentinel Server의 관리자 키로 사용하고,<br />
+              &nbsp;&nbsp;API 호출 시 <code>X-Admin-Key</code> 헤더로 전달합니다.
+            </p>
+
+            <button type="submit" class="btn btn-primary btn-block">
+              Log in
+            </button>
+
+            <p id="login-error" class="form-error" hidden></p>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <script src="./js/api.js"></script>
+    <script src="./js/login.js"></script>
+  </body>
 </html>

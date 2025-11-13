@@ -43,13 +43,12 @@ document.addEventListener("DOMContentLoaded", () => {
         "0"
       )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
         now.getSeconds()
-      ).padStart(2,
-      "0")}`;
+      ).padStart(2, "0")}`;
     }
   }
 
   async function loadSummary() {
-    // ★ 여기도 /summary 로 호출
+    // ★ 백엔드 라우트: /api/summary
     const summary = await window.SentinelApi.get("/summary");
 
     // 1) KPI
@@ -91,8 +90,10 @@ document.addEventListener("DOMContentLoaded", () => {
       ?.getContext("2d");
     if (ctxRecent) {
       const hourly = summary.hourly_attempts || [];
-      const labels = hourly.map((h) => `${h.hour}:00`);
-      const data = hourly.map((h) => h.count);
+
+      // hourly는 [24] 숫자 배열이므로, 인덱스를 시간으로 사용
+      const labels = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+      const data = labels.map((_, i) => hourly[i] || 0);
 
       if (chartRecentAttempts) chartRecentAttempts.destroy();
       chartRecentAttempts = new Chart(ctxRecent, {
@@ -167,9 +168,12 @@ document.addEventListener("DOMContentLoaded", () => {
       .getElementById("chart-today-hourly")
       ?.getContext("2d");
     if (ctxTodayHourly) {
-      const todayHourly = summary.today_hourly || summary.hourly_attempts || [];
-      const labels = todayHourly.map((h) => `${h.hour}:00`);
-      const data = todayHourly.map((h) => h.count);
+      // today_hourly가 있으면 그걸, 없으면 전체 hourly_attempts 사용
+      const todayHourlyRaw =
+        summary.today_hourly || summary.hourly_attempts || [];
+
+      const labels = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+      const data = labels.map((_, i) => todayHourlyRaw[i] || 0);
 
       if (chartTodayHourly) chartTodayHourly.destroy();
       chartTodayHourly = new Chart(ctxTodayHourly, {
@@ -210,12 +214,12 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // 7) 시간대별 유형 (stacked bar)
+    // 7) 시간대별 유형 (stacked bar) — summary.hourly_type 이 있을 때만
     const ctxHourlyType = document
       .getElementById("chart-hourly-type")
       ?.getContext("2d");
     if (ctxHourlyType && summary.hourly_type) {
-      const hours = Object.keys(summary.hourly_type); // "00","01",...
+      const hours = Object.keys(summary.hourly_type); // "0","1",...
       const typeNames = new Set();
       hours.forEach((h) => {
         Object.keys(summary.hourly_type[h]).forEach((t) => typeNames.add(t));

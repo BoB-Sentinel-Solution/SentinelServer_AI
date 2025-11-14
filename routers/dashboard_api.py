@@ -227,6 +227,7 @@ def dashboard_summary(
                 "hostname": r.hostname,
                 "public_ip": r.public_ip,
                 "private_ip": r.private_ip,
+                "internal_ip": r.private_ip,  # 대시보드 테이블에서 쓰는 필드
                 "action": r.action,
                 "has_sensitive": r.has_sensitive,
                 "file_blocked": r.file_blocked,
@@ -242,6 +243,7 @@ def dashboard_summary(
                 "hostname": r.hostname,
                 "public_ip": r.public_ip,
                 "private_ip": r.private_ip,
+                "internal_ip": r.private_ip,  # 대시보드 테이블에서 쓰는 필드
                 "action": r.action,
                 "has_sensitive": r.has_sensitive,
                 "file_blocked": r.file_blocked,

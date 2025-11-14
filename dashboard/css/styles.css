@@ -793,3 +793,131 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ============================
+   TODAY'S DETECTION 카드 스타일
+   ============================ */
+
+.card.card-today {
+  /* 기존 card 공통 스타일 덮어쓰기 */
+  background: linear-gradient(135deg, #4f8dff 0%, #2f63c8 45%, #1b2f5f 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 24px;
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.15);
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 상단 헤더 영역 */
+.card-header--today {
+  background: transparent;
+  border-bottom: none;
+  padding: 0;
+  margin-bottom: 10px;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+/* "TODAY'S DETECTION" 뱃지 */
+.card-header--today .badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fdfdfd;
+}
+
+/* 상단 좌측 작은 숫자 배지들 (중요정보 탐지, 차단) */
+.today-metrics {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.today-metrics span {
+  background: #ffffff;
+  color: #1a2340;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 4px 8px rgba(7, 23, 63, 0.18);
+}
+
+.today-metrics strong {
+  font-size: 15px;
+}
+
+/* 상단 우측 날짜/시간 */
+.today-date {
+  text-align: right;
+  color: #ffffff;
+}
+
+#today-date {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+#today-time {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* 하단 차트 영역 */
+.card-body-today {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 흰색 안쪽 카드 두 개 */
+.card-today-chart {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 18px;
+  padding: 10px 16px 12px;
+  box-shadow: 0 10px 18px rgba(5, 22, 66, 0.18);
+}
+
+.card-today-chart + .card-today-chart {
+  margin-top: 2px;
+}
+
+/* 차트 제목 */
+.card-today-chart .card-subtitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c2640;
+}
+
+/* 차트 캔버스가 가로를 꽉 채우도록 */
+.card-today-chart canvas {
+  width: 100% !important;
+  height: auto !important;
+}
+
+/* 작은 화면에서 여백 조금 줄이기 */
+@media (max-width: 991.98px) {
+  .card.card-today {
+    padding: 14px 14px 16px;
+    border-radius: 18px;
+  }
+
+  #today-date {
+    font-size: 22px;
+  }
+}

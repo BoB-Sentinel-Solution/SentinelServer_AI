@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel Report - LLM Service Based</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body class="sentinel-body">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+          <a class="top-menu-item top-menu-item--active" href="./report.html"
+            >Report</a
+          >
+          <a class="top-menu-item" href="./logs.html">Logs</a>
+          <a class="top-menu-item" href="#">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <!-- 메인 컨텐츠 -->
+    <main class="report-layout">
+      <!-- 상단 LLM / MCP 탭 -->
+      <section class="report-tabs-row">
+        <div class="report-tabs">
+          <button class="report-tab report-tab--active">LLM</button>
+          <button class="report-tab" disabled>MCP</button>
+        </div>
+      </section>
+
+      <section class="report-main">
+        <!-- 좌측 카테고리 사이드바 -->
+        <aside class="report-sidebar">
+          <div class="report-sidebar-group">
+            <div class="report-sidebar-group-title">INFORMATION BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item">
+                <a href="./report.html">탐지된 중요정보 비율</a>
+              </li>
+              <li class="report-sidebar-item">중요정보 탐지 통계</li>
+              <li class="report-sidebar-item">시간대 별 중요정보 탐지 추이</li>
+            </ul>
+          </div>
+
+          <div class="report-sidebar-group">
+            <div class="report-sidebar-group-title">TIME BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item">
+                <a href="./report_llm_time.html">
+                  시간대별 사용량 및 중요정보 탐지 횟수
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="report-sidebar-group report-sidebar-group--active">
+            <div class="report-sidebar-group-title">SERVICE BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item report-sidebar-item--active">
+                전체 서비스 사용량
+              </li>
+              <li class="report-sidebar-item">서비스 별 중요 정보 탐지</li>
+              <li class="report-sidebar-item">시간대 별 서비스 사용량 추이</li>
+            </ul>
+          </div>
+
+          <div class="report-sidebar-group">
+            <div class="report-sidebar-group-title">FILE BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item">파일 별 중요 정보 탐지 현황</li>
+              <li class="report-sidebar-item">파일 형태 별 중요정보 탐지 유형</li>
+              <li class="report-sidebar-item">처리 현황</li>
+            </ul>
+          </div>
+        </aside>
+
+        <!-- 우측 내용 영역 -->
+        <section class="report-content">
+          <!-- 상단 2개 카드 -->
+          <div class="report-row">
+            <article class="card report-card-half">
+              <header class="card-header">
+                <h3 class="card-title">전체 서비스 사용량</h3>
+                <span class="card-subtitle">LLM 호출 기준, 최근 24시간</span>
+              </header>
+              <div class="card-body">
+                <canvas id="chart-service-total-usage" height="200"></canvas>
+              </div>
+            </article>
+
+            <article class="card report-card-half">
+              <header class="card-header">
+                <h3 class="card-title">서비스 별 중요 정보 탐지</h3>
+                <span class="card-subtitle">LLM 인터페이스 기준, 호스트 도메인 단위</span>
+              </header>
+              <div class="card-body">
+                <canvas
+                  id="chart-service-sensitive-by-host"
+                  height="200"
+                ></canvas>
+              </div>
+            </article>
+          </div>
+
+          <!-- 하단 1개 카드 (풀폭) -->
+          <div class="report-row">
+            <article class="card report-card-full">
+              <header class="card-header report-card-header-full">
+                <div>
+                  <h3 class="card-title">시간대 별 서비스 사용량 추이</h3>
+                  <span class="card-subtitle">
+                    최근 24시간 기준, LLM 서비스 전체 트래픽
+                  </span>
+                </div>
+
+                <div class="report-full-controls">
+                  <div class="report-risk-indicator">
+                    <span class="report-risk-label">오늘의 위험 지수:</span>
+                    <span class="report-risk-dot"></span>
+                    <span
+                      id="service-risk-level"
+                      class="report-risk-level"
+                      >-</span
+                    >
+                  </div>
+                </div>
+              </header>
+
+              <div class="report-card-body report-card-body--full">
+                <canvas
+                  id="chart-service-hourly-usage"
+                  class="report-chart-full"
+                ></canvas>
+                <p class="report-note">
+                  ※ 선 그래프: 시간대별 LLM 전체 호출 수. 스파이크 구간은
+                  서비스 과다 사용 또는 위험 구간으로 볼 수 있습니다.
+                </p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/report_llm_service.js"></script>
+  </body>
+</html>

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel Report · LLM · File Based</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+
+  <body class="sentinel-body">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+          <a class="top-menu-item top-menu-item--active" href="./report.html">Report</a>
+          <a class="top-menu-item" href="./logs.html">Logs</a>
+          <a class="top-menu-item" href="#">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <!-- REPORT 상단 탭 (LLM / MCP) -->
+    <main class="report-layout">
+      <section class="report-tabs-row">
+        <div class="report-tabs">
+          <a class="report-tab report-tab--active" href="./report.html">LLM</a>
+          <a class="report-tab" href="./report_mcp_info.html">MCP</a>
+        </div>
+      </section>
+
+      <section class="report-content">
+        <!-- 좌측 사이드바 -->
+        <aside class="report-sidebar">
+          <div class="report-sidebar-inner">
+            <!-- INFORMATION BASED -->
+            <div class="side-group">
+              <div class="side-group-title">| INFORMATION BASED</div>
+              <a class="side-link" href="./report.html">탐지된 중요정보 비율</a>
+              <a class="side-link" href="./report.html#stats">중요정보 탐지 통계</a>
+              <a class="side-link" href="./report.html#trend">시간대 별 중요정보 탐지 추이</a>
+            </div>
+
+            <!-- TIME BASED -->
+            <div class="side-group">
+              <div class="side-group-title">| TIME BASED</div>
+              <a class="side-link" href="./report_llm_time.html">
+                시간대별 사용량 및 중요정보 탐지 횟수
+              </a>
+            </div>
+
+            <!-- SERVICE BASED -->
+            <div class="side-group">
+              <div class="side-group-title">| SERVICE BASED</div>
+              <a class="side-link" href="./report_llm_service.html">
+                전체 서비스 사용량 / 서비스 별 중요정보 탐지
+              </a>
+              <a class="side-link" href="./report_llm_service.html#trend">
+                시간대 별 서비스 사용량 추이
+              </a>
+            </div>
+
+            <!-- FILE BASED (현재 페이지) -->
+            <div class="side-group">
+              <div class="side-group-title">| FILE BASED</div>
+              <a class="side-link side-link--active" href="./report_llm_file.html">
+                파일 별 중요 정보 탐지 현황
+              </a>
+              <a class="side-link" href="./report_llm_file.html#by-type">
+                파일 형태 별 중요정보 탐지 유형
+              </a>
+              <a class="side-link" href="./report_llm_file.html#table">
+                처리 현황
+              </a>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 메인 카드 영역 -->
+        <section class="report-main">
+          <!-- 1행: 도넛 + 스택 막대 -->
+          <div class="report-row report-row--top">
+            <!-- 파일 별 중요 정보 탐지 (도넛) -->
+            <article class="card report-card report-card--half" id="card-file-donut">
+              <header class="card-header">
+                <h3 class="card-title">파일 별 중요 정보 탐지 현황</h3>
+                <span class="card-subtitle">attachment.format 기준</span>
+              </header>
+              <div class="card-body card-body--center">
+                <canvas id="chart-file-ext-donut" height="220"></canvas>
+                <p class="card-note" id="file-donut-empty" style="display:none;">
+                  아직 파일 기반 탐지 로그가 없습니다.
+                </p>
+              </div>
+            </article>
+
+            <!-- 각 파일 형태 별 탐지된 중요정보 유형 (가로 스택 바) -->
+            <article class="card report-card report-card--half" id="card-file-stack">
+              <header class="card-header">
+                <h3 class="card-title">각 파일 형태 별 탐지된 중요정보 유형</h3>
+                <span class="card-subtitle">
+                  확장자 × 엔티티 라벨 기준 (LLM 인터페이스)
+                </span>
+              </header>
+              <div class="card-body">
+                <canvas id="chart-file-ext-labels" height="260"></canvas>
+                <p class="card-note" id="file-stack-empty" style="display:none;">
+                  표시할 파일/라벨 조합이 없습니다.
+                </p>
+              </div>
+            </article>
+          </div>
+
+          <!-- 2행: 처리 현황 테이블 -->
+          <div class="report-row report-row--bottom" id="table">
+            <article class="card report-card report-card--full">
+              <header class="card-header">
+                <h3 class="card-title">처리 현황</h3>
+                <span class="card-subtitle">
+                  최근 파일이 첨부된 LLM 요청 기준 (최대 20건)
+                </span>
+              </header>
+
+              <div class="table-wrapper">
+                <table class="log-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Host</th>
+                      <th>PC Name</th>
+                      <th>Public IP</th>
+                      <th>Private IP</th>
+                      <th>Action</th>
+                      <th>민감</th>
+                      <th>파일 차단</th>
+                      <th>Download</th>
+                    </tr>
+                  </thead>
+                  <tbody id="file-log-tbody">
+                    <!-- JS에서 채움 -->
+                  </tbody>
+                </table>
+                <p class="card-note" id="file-table-empty" style="display:none;">
+                  파일 첨부 로그가 아직 없습니다.
+                </p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/report_llm_file.js"></script>
+  </body>
+</html>

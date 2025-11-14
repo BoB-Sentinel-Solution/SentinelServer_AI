@@ -226,6 +226,7 @@ def dashboard_summary(
                 "host": r.host,
                 "hostname": r.hostname,
                 "public_ip": r.public_ip,
+                "private_ip": r.private_ip,
                 "action": r.action,
                 "has_sensitive": r.has_sensitive,
                 "file_blocked": r.file_blocked,

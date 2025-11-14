@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel Report - LLM</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body class="sentinel-body">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+          <a class="top-menu-item top-menu-item--active" href="./report.html">Report</a>
+          <a class="top-menu-item" href="./logs.html">Logs</a>
+          <a class="top-menu-item" href="#">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <!-- 메인 컨텐츠 -->
+    <main class="report-layout">
+      <!-- 상단 LLM / MCP 탭 -->
+      <section class="report-tabs-row">
+        <div class="report-tabs">
+          <button class="report-tab report-tab--active">LLM</button>
+          <button class="report-tab" disabled>MCP</button>
+        </div>
+      </section>
+
+      <section class="report-main">
+        <!-- 좌측 카테고리 사이드바 -->
+        <aside class="report-sidebar">
+          <div class="report-sidebar-group report-sidebar-group--active">
+            <div class="report-sidebar-group-title">INFORMATION BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item report-sidebar-item--active">
+                탐지된 중요정보 비율
+              </li>
+              <li class="report-sidebar-item">중요정보 탐지 통계</li>
+              <li class="report-sidebar-item">시간대 별 중요정보 탐지 추이</li>
+            </ul>
+          </div>
+
+          <div class="report-sidebar-group">
+            <div class="report-sidebar-group-title">TIME BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item">시간대별 사용량 분석</li>
+              <li class="report-sidebar-item">요일/기간별 탐지 패턴</li>
+            </ul>
+          </div>
+
+          <div class="report-sidebar-group">
+            <div class="report-sidebar-group-title">SERVICE BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item">서비스별 LLM 사용 추이</li>
+              <li class="report-sidebar-item">위험도 높은 서비스 식별</li>
+            </ul>
+          </div>
+
+          <div class="report-sidebar-group">
+            <div class="report-sidebar-group-title">FILE BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item">파일 업로드 기반 탐지</li>
+              <li class="report-sidebar-item">유사 파일 재업로드 분석</li>
+            </ul>
+          </div>
+        </aside>
+
+        <!-- 우측 내용 영역 -->
+        <section class="report-content">
+          <!-- 상단 3장 (한 줄, 동일 높이) -->
+          <div class="report-grid report-grid-top">
+            <!-- 카드 1: 탐지된 중요정보 비율 -->
+            <article class="card report-card">
+              <header class="card-header">
+                <h3 class="card-title">탐지된 중요정보 비율</h3>
+                <span class="card-subtitle">전체 탐지 중 중요정보 비중</span>
+              </header>
+              <div class="report-card-body">
+                <canvas id="chart-info-ratio" class="report-chart"></canvas>
+              </div>
+            </article>
+
+            <!-- 카드 2: 중요정보 탐지 통계 -->
+            <article class="card report-card">
+              <header class="card-header">
+                <h3 class="card-title">중요정보 탐지 통계</h3>
+                <span class="card-subtitle">중요정보 탐지 횟수 및 추이</span>
+              </header>
+              <div class="report-card-body">
+                <canvas id="chart-info-stats" class="report-chart"></canvas>
+              </div>
+            </article>
+
+            <!-- 카드 3: 중요정보 탐지 유형 분류 (도넛) -->
+            <article class="card report-card">
+              <header class="card-header">
+                <h3 class="card-title">중요정보 탐지 유형 분류</h3>
+                <span class="card-subtitle">LABEL 기준 TOP 유형</span>
+              </header>
+              <div class="report-card-body report-card-body--center">
+                <canvas id="chart-info-types" class="report-chart-donut"></canvas>
+              </div>
+            </article>
+          </div>
+
+          <!-- 하단 3장 (한 줄, 동일 높이) -->
+          <div class="report-grid report-grid-bottom">
+            <!-- 카드 4: 최근 7일 탐지 추이 -->
+            <article class="card report-card">
+              <header class="card-header">
+                <h3 class="card-title">시간대 별 중요정보 탐지 추이</h3>
+                <span class="card-subtitle">최근 7일 중요정보 탐지</span>
+              </header>
+              <div class="report-card-body">
+                <canvas id="chart-info-trend-week" class="report-chart"></canvas>
+              </div>
+            </article>
+
+            <!-- 카드 5: 지난 7일 vs 최근 7일 비교 -->
+            <article class="card report-card">
+              <header class="card-header">
+                <h3 class="card-title">시간대 별 중요정보 탐지 추이</h3>
+                <span class="card-subtitle">지난 7일 / 최근 7일 변화 비교</span>
+              </header>
+              <div class="report-card-body">
+                <canvas id="chart-info-trend-compare" class="report-chart"></canvas>
+              </div>
+            </article>
+
+            <!-- 카드 6: Prediction 카드 -->
+            <article class="card report-card report-card-prediction">
+              <header class="card-header">
+                <h3 class="card-title">PREDICTION</h3>
+              </header>
+              <div class="report-card-body report-card-body--prediction">
+                <p class="prediction-label">오늘의 위험 지수</p>
+                <div class="prediction-score-wrapper">
+                  <span id="prediction-score" class="prediction-score">-</span>
+                  <span class="prediction-score-unit">/ 100</span>
+                </div>
+
+                <p class="prediction-text">
+                  최근 LLM 서비스에서 <strong>전화번호</strong>가 반복적으로 탐지되고 있습니다.
+                  이 패턴이 유지될 경우, <strong>다음 OOO 시기</strong>에 유사한 노출 위험이
+                  다시 발생할 가능성이 높습니다.
+                </p>
+
+                <ul class="prediction-bullets">
+                  <li>특정 부서/계정에서의 민감정보 과다 사용 여부 점검</li>
+                  <li>해당 기간 정책 알림 및 추가 모니터링 권고</li>
+                </ul>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <!-- 스크립트: 나중에 report.js 에서 차트 렌더링 -->
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/report.js"></script>
+  </body>
+</html>

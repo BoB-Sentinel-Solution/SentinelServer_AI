@@ -1,15 +1,13 @@
 # routers/dashboard_api.py
 from __future__ import annotations
 
-from sqlalchemy import cast, Text, func
-
 from typing import Dict, List, Any
 from collections import defaultdict
 from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import cast, Text  # entities(JSON) 문자열 검색용
+from sqlalchemy import cast, Text, func  # entities(JSON) 검색 + interface 필터용
 
 from db import SessionLocal, Base, engine
 from models import LogRecord
@@ -32,6 +30,7 @@ def get_db():
     finally:
         db.close()
 
+
 # --- 선택적 API 키 인증 ---
 def require_admin(x_admin_key: str | None = Header(default=None)):
     """
@@ -45,15 +44,16 @@ def require_admin(x_admin_key: str | None = Header(default=None)):
                 detail="Invalid API key",
             )
 
+
 # ---------- 요약 API ----------
 @router.get("/summary", dependencies=[Depends(require_admin)])
 def dashboard_summary(
-    interface: str | None = None,             # ★ 추가: ?interface=LLM 등 필터
+    interface: str | None = None,  # ?interface=LLM / MCP 등 필터
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     대시보드 요약 데이터:
-    - total_sensitive: has_sensitive=True 총 건수 (탐지 총합)
+    - total_sensitive: has_sensitive=True 총 건수
     - total_blocked: 차단된 요청 수 (allow=False 또는 action startswith("block"))
     - type_ratio: 라벨 비율(엔티티 라벨 카운트, 전체 기간)
     - type_detected: 유형별 탐지 횟수(전체 기간)
@@ -61,28 +61,27 @@ def dashboard_summary(
     - hourly_attempts: 0~23시 카운트(모든 요청, 전체 기간)
     - hourly_type: 시간대별(0~23) · 라벨별 탐지 건수 (has_sensitive=True)
     - recent_logs: 최근 20건 (민감값 미노출)
+    - ip_band_detected / ip_band_blocked: 공인IP /16 대역별 탐지/차단 건수
 
-    - today_sensitive: 오늘 탐지된 건수 (has_sensitive=True)
-    - today_blocked: 오늘 차단된 요청 수
+    - today_sensitive / today_blocked: 오늘 탐지·차단 건수
     - today_hourly: 오늘 시간대별 탐지 건수 [0..23]
     - today_type_ratio: 오늘 탐지된 라벨 비율
-    - ip_band_detected: 공인IP /16 대역별 탐지 건수 (has_sensitive=True, 전체 기간)
-    - ip_band_blocked: 공인IP /16 대역별 차단 건수 (전체 기간)
 
     추가:
-    - interface 파라미터가 주어지면 해당 interface 로그만 집계 (예: LLM, MCP)
+    - service_usage_by_host: 호스트별 전체 호출 수
+    - service_sensitive_by_host: 호스트별 민감정보 탐지 수
+    - service_blocked_by_host: 호스트별 차단 수
+
+    interface 파라미터가 주어지면 해당 interface 로그만 집계 (예: LLM, MCP)
     """
 
     # --- 쿼리 구성: interface 있으면 필터 ---
     query = db.query(LogRecord)
     if interface:
-        # 앞뒤 공백 제거 + 소문자로 통일해서 비교
         q_interface = interface.strip().lower()
         query = query.filter(func.lower(LogRecord.interface) == q_interface)
 
-    rows: List[LogRecord] = (
-        query.order_by(LogRecord.created_at.desc()).all()
-    )
+    rows: List[LogRecord] = query.order_by(LogRecord.created_at.desc()).all()
 
     # 오늘 날짜 (created_at 이 timezone-aware 라면 적절히 맞춰야 함)
     today: date = datetime.utcnow().date()
@@ -100,6 +99,11 @@ def dashboard_summary(
     type_blocked: Dict[str, int] = defaultdict(int)
     ip_band_blocked: Dict[str, int] = defaultdict(int)
 
+    # 서비스(호스트)별 집계
+    service_usage_by_host: Dict[str, int] = defaultdict(int)       # 전체 호출 수
+    service_sensitive_by_host: Dict[str, int] = defaultdict(int)   # 민감정보 탐지 수
+    service_blocked_by_host: Dict[str, int] = defaultdict(int)     # 차단 수
+
     # 오늘 기준 통계
     today_sensitive = 0
     today_blocked = 0
@@ -114,9 +118,12 @@ def dashboard_summary(
 
     for r in rows:
         created = r.created_at
-        # created_at 이 None인 경우를 대비
         created_date: date | None = created.date() if created else None
         hour: int | None = created.hour if created else None
+
+        # 공통: 서비스(호스트)별 전체 사용량
+        host_key = r.host or "unknown"
+        service_usage_by_host[host_key] += 1
 
         # === 공통: 시간대별 "시도" 카운트 (모든 요청) ===
         if hour is not None and 0 <= hour < 24:
@@ -128,6 +135,7 @@ def dashboard_summary(
         # === 탐지 관련 집계 ===
         if r.has_sensitive:
             total_sensitive += 1
+            service_sensitive_by_host[host_key] += 1  # 호스트별 탐지 수
 
             # 유형 비율/탐지 횟수: 엔티티 라벨 기준
             for e in (r.entities or []):
@@ -162,6 +170,8 @@ def dashboard_summary(
 
         if is_blocked:
             total_blocked += 1
+            service_blocked_by_host[host_key] += 1  # 호스트별 차단 수
+
             if created_date == today:
                 today_blocked += 1
 
@@ -178,17 +188,26 @@ def dashboard_summary(
 
         # === 최근 로그 20건 (민감값 미노출) ===
         if len(recent_logs) < 20:
-            recent_logs.append({
-                "time": r.created_at.isoformat() if r.created_at else getattr(r, "time", None),
-                "host": r.host,
-                "hostname": r.hostname,
-                "public_ip": r.public_ip,
-                "action": r.action,
-                "has_sensitive": r.has_sensitive,
-                "file_blocked": r.file_blocked,
-                "entities": [{"label": (e.get("label") or "")} for e in (r.entities or [])],
-                "prompt": (r.prompt[:120] + "…") if r.prompt and len(r.prompt) > 120 else (r.prompt or ""),
-            })
+            recent_logs.append(
+                {
+                    "time": r.created_at.isoformat()
+                    if r.created_at
+                    else getattr(r, "time", None),
+                    "host": r.host,
+                    "hostname": r.hostname,
+                    "public_ip": r.public_ip,
+                    "action": r.action,
+                    "has_sensitive": r.has_sensitive,
+                    "file_blocked": r.file_blocked,
+                    "entities": [
+                        {"label": (e.get("label") or "")}
+                        for e in (r.entities or [])
+                    ],
+                    "prompt": (r.prompt[:120] + "…")
+                    if r.prompt and len(r.prompt) > 120
+                    else (r.prompt or ""),
+                }
+            )
 
     # hourly_type 은 {시간(int): {라벨:카운트}} → JSON 직렬화 위해 키를 문자열로
     hourly_type_serialized: Dict[str, Dict[str, int]] = {
@@ -207,6 +226,11 @@ def dashboard_summary(
         "recent_logs": recent_logs,
         "ip_band_detected": dict(ip_band_detected),
         "ip_band_blocked": dict(ip_band_blocked),
+
+        # 서비스(호스트)별 통계
+        "service_usage_by_host": dict(service_usage_by_host),
+        "service_sensitive_by_host": dict(service_sensitive_by_host),
+        "service_blocked_by_host": dict(service_blocked_by_host),
 
         # 오늘 기준 통계
         "today_sensitive": today_sensitive,
@@ -281,22 +305,24 @@ def list_logs(
 
     items: List[Dict[str, Any]] = []
     for r in rows:
-        items.append({
-            "id": getattr(r, "request_id", None),
-            "prompt": r.prompt,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-            "time": r.created_at.isoformat() if r.created_at else None,
-            "host": r.host,
-            "hostname": r.hostname,
-            "public_ip": r.public_ip,
-            "internal_ip": r.private_ip,            # 프론트에서는 Internal IP/Private IP 컬럼으로 사용
-            "interface": r.interface,
-            "action": r.action,
-            "allow": r.allow,
-            "has_sensitive": r.has_sensitive,
-            "file_blocked": r.file_blocked,
-            "entities": r.entities or [],
-        })
+        items.append(
+            {
+                "id": getattr(r, "request_id", None),
+                "prompt": r.prompt,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "time": r.created_at.isoformat() if r.created_at else None,
+                "host": r.host,
+                "hostname": r.hostname,
+                "public_ip": r.public_ip,
+                "internal_ip": r.private_ip,  # 프론트에서는 Internal IP/Private IP 컬럼으로 사용
+                "interface": r.interface,
+                "action": r.action,
+                "allow": r.allow,
+                "has_sensitive": r.has_sensitive,
+                "file_blocked": r.file_blocked,
+                "entities": r.entities or [],
+            }
+        )
 
     return {
         "items": items,

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel Report - MCP / Information Based</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body class="sentinel-body">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+          <!-- Report 메인 진입점은 LLM 정보 기반 리포트로 가정 -->
+          <a class="top-menu-item top-menu-item--active" href="./report_llm_info.html">Report</a>
+          <a class="top-menu-item" href="./logs.html">Logs</a>
+          <a class="top-menu-item" href="./settings.html">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <main class="report-layout">
+      <!-- 상단 LLM / MCP 탭 -->
+      <div class="report-tab-switch">
+        <a href="./report_llm_info.html" class="report-tab">LLM</a>
+        <a href="./report_mcp_information.html" class="report-tab report-tab--active">MCP</a>
+      </div>
+
+      <!-- 좌측 사이드 메뉴 -->
+      <aside class="report-side-nav">
+        <!-- MCP 카테고리 -->
+        <section class="side-section">
+          <h3 class="side-section-title">OVERALL</h3>
+          <a href="./report_mcp_overall.html" class="side-menu-item">
+            MCP 서버 사용 순위
+          </a>
+          <a href="./report_mcp_overall.html" class="side-menu-item">
+            MCP 사용량
+          </a>
+        </section>
+
+        <section class="side-section side-section--active">
+          <h3 class="side-section-title">INFORMATION BASED</h3>
+          <a href="./report_mcp_information.html" class="side-menu-item side-menu-item--active">
+            중요정보 탐지
+          </a>
+          <a href="./report_mcp_information.html" class="side-menu-item">
+            서비스별 중요 정보 탐지
+          </a>
+          <a href="./report_mcp_information.html" class="side-menu-item">
+            MCP 사용량 추이
+          </a>
+        </section>
+
+        <section class="side-section">
+          <h3 class="side-section-title">CONFIG</h3>
+          <a href="./report_mcp_config.html" class="side-menu-item">
+            활성화된 MCP 개수
+          </a>
+          <a href="./report_mcp_config.html" class="side-menu-item">
+            활성화된 MCP마다의 타임 분포
+          </a>
+          <a href="./report_mcp_config.html" class="side-menu-item">
+            시간대별 업데이트된 MCP 목록
+          </a>
+          <a href="./report_mcp_config.html" class="side-menu-item">
+            호스트별 활성 MCP 개수 순위
+          </a>
+        </section>
+      </aside>
+
+      <!-- 우측 메인 콘텐츠 -->
+      <section class="report-main">
+        <!-- 상단 필터 / 위험지수 영역 -->
+        <div class="report-header-bar">
+          <div class="report-range-switch">
+            <button class="range-btn range-btn--active" data-range="recent">최근</button>
+            <button class="range-btn" data-range="7d">7일 간</button>
+            <button class="range-btn" data-range="all">통계 자료</button>
+          </div>
+          <div class="risk-indicator">
+            <span class="risk-label">오늘의 위험 지수:</span>
+            <span class="risk-dot"></span>
+            <span class="risk-level">보통</span>
+          </div>
+        </div>
+
+        <!-- 1행: 중요정보 탐지 / 서비스별 중요 정보 탐지 -->
+        <div class="report-row">
+          <div class="card report-card">
+            <div class="card-header">
+              <h3 class="card-title">중요정보 탐지</h3>
+              <span class="card-subtitle">MCP 인터페이스에서 탐지된 중요 정보 유형 분포</span>
+            </div>
+            <div class="card-body">
+              <canvas id="chart-mcp-info-type-total" height="180"></canvas>
+            </div>
+          </div>
+
+          <div class="card report-card">
+            <div class="card-header">
+              <h3 class="card-title">서비스별 중요 정보 탐지</h3>
+              <span class="card-subtitle">호스트(서비스) 기준 중요 정보 탐지 건수</span>
+            </div>
+            <div class="card-body">
+              <canvas id="chart-mcp-info-by-host" height="180"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2행: MCP 사용량 추이 + Prediction -->
+        <div class="report-row report-row--bottom">
+          <div class="card report-card report-card--wide">
+            <div class="card-header">
+              <h3 class="card-title">MCP 사용량 추이</h3>
+              <span class="card-subtitle">시간대별 MCP 호출 시도 횟수</span>
+            </div>
+            <div class="card-body">
+              <canvas id="chart-mcp-usage-trend" height="140"></canvas>
+            </div>
+          </div>
+
+          <div class="card report-card report-card--prediction">
+            <div class="card-header">
+              <h3 class="card-title">PREDICTION</h3>
+            </div>
+            <div class="card-body prediction-body">
+              <p>
+                최근 <strong>MCP 서비스</strong>에서 특정 계정의
+                <strong> 중요정보(예: 전화번호, 인증 토큰)</strong>가 반복적으로 탐지되고 있습니다.
+              </p>
+              <p>
+                동일 시간대와 서비스 조합에서 유사한 패턴이 이어질 경우,
+                향후 <strong>동일 MCP 서버</strong>를 통한 대량 정보 유출 시도가
+                발생할 수 있으므로 모니터링 강화가 필요합니다.
+              </p>
+              <p class="prediction-note">
+                ※ 실제 값은 Sentinel Server의 통계 데이터를 기반으로 자동 계산되며,
+                본 화면은 PoC 용 예시 설명입니다.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/report_mcp_information.js"></script>
+  </body>
+</html>

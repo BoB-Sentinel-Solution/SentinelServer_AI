@@ -7,7 +7,7 @@ from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import cast, Text  # ★ entities 검색용
+from sqlalchemy import cast, Text  # entities(JSON) 문자열 검색용
 
 from db import SessionLocal, Base, engine
 from models import LogRecord
@@ -45,7 +45,10 @@ def require_admin(x_admin_key: str | None = Header(default=None)):
 
 # ---------- 요약 API ----------
 @router.get("/summary", dependencies=[Depends(require_admin)])
-def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
+def dashboard_summary(
+    interface: str | None = None,             # ★ 추가: ?interface=LLM 등 필터
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """
     대시보드 요약 데이터:
     - total_sensitive: has_sensitive=True 총 건수 (탐지 총합)
@@ -63,9 +66,18 @@ def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
     - today_type_ratio: 오늘 탐지된 라벨 비율
     - ip_band_detected: 공인IP /16 대역별 탐지 건수 (has_sensitive=True, 전체 기간)
     - ip_band_blocked: 공인IP /16 대역별 차단 건수 (전체 기간)
+
+    추가:
+    - interface 파라미터가 주어지면 해당 interface 로그만 집계 (예: LLM, MCP)
     """
+
+    # --- 쿼리 구성: interface 있으면 필터 ---
+    query = db.query(LogRecord)
+    if interface:
+        query = query.filter(LogRecord.interface == interface)
+
     rows: List[LogRecord] = (
-        db.query(LogRecord).order_by(LogRecord.created_at.desc()).all()
+        query.order_by(LogRecord.created_at.desc()).all()
     )
 
     # 오늘 날짜 (created_at 이 timezone-aware 라면 적절히 맞춰야 함)

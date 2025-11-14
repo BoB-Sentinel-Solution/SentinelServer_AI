@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel Report - LLM Time Based</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body class="sentinel-body">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+          <a class="top-menu-item top-menu-item--active" href="./report.html">Report</a>
+          <a class="top-menu-item" href="./logs.html">Logs</a>
+          <a class="top-menu-item" href="#">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <!-- 메인 컨텐츠 -->
+    <main class="report-layout">
+      <!-- 상단 LLM / MCP 탭 -->
+      <section class="report-tabs-row">
+        <div class="report-tabs">
+          <button class="report-tab report-tab--active">LLM</button>
+          <button class="report-tab" disabled>MCP</button>
+        </div>
+      </section>
+
+      <section class="report-main">
+        <!-- 좌측 카테고리 사이드바 -->
+        <aside class="report-sidebar">
+          <div class="report-sidebar-group">
+            <div class="report-sidebar-group-title">INFORMATION BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item">
+                <a href="./report.html">탐지된 중요정보 비율</a>
+              </li>
+              <li class="report-sidebar-item">중요정보 탐지 통계</li>
+              <li class="report-sidebar-item">시간대 별 중요정보 탐지 추이</li>
+            </ul>
+          </div>
+
+          <div class="report-sidebar-group report-sidebar-group--active">
+            <div class="report-sidebar-group-title">TIME BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item report-sidebar-item--active">
+                시간대별 사용량 및 중요정보 탐지 횟수
+              </li>
+            </ul>
+          </div>
+
+          <div class="report-sidebar-group">
+            <div class="report-sidebar-group-title">SERVICE BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item">전체 서비스 사용량</li>
+              <li class="report-sidebar-item">서비스 별 중요정보 탐지</li>
+              <li class="report-sidebar-item">시간대 별 서비스 사용량 추이</li>
+            </ul>
+          </div>
+
+          <div class="report-sidebar-group">
+            <div class="report-sidebar-group-title">FILE BASED</div>
+            <ul class="report-sidebar-list">
+              <li class="report-sidebar-item">파일 별 중요 정보 탐지 현황</li>
+              <li class="report-sidebar-item">파일 형태 별 중요정보 탐지 유형</li>
+              <li class="report-sidebar-item">처리 현황</li>
+            </ul>
+          </div>
+        </aside>
+
+        <!-- 우측 내용 영역 -->
+        <section class="report-content">
+          <article class="card report-card-full">
+            <header class="card-header report-card-header-full">
+              <div>
+                <h3 class="card-title">시간대별 사용량 및 중요정보 탐지 횟수</h3>
+                <span class="card-subtitle">LLM 인터페이스 기준</span>
+              </div>
+
+              <div class="report-full-controls">
+                <div class="report-range-toggle">
+                  <button class="report-range-btn report-range-btn--active">
+                    최근
+                  </button>
+                  <button class="report-range-btn">7일 간</button>
+                  <button class="report-range-btn" disabled>통계 자료</button>
+                </div>
+                <div class="report-risk-indicator">
+                  <span class="report-risk-label">오늘의 위험 지수:</span>
+                  <span class="report-risk-dot"></span>
+                  <span id="time-risk-level" class="report-risk-level">-</span>
+                </div>
+              </div>
+            </header>
+
+            <div class="report-card-body report-card-body--full">
+              <canvas
+                id="chart-time-usage"
+                class="report-chart-full"
+              ></canvas>
+              <p class="report-note">
+                ※ 막대 그래프: 유형별 중요정보 탐지 건수(스택), 선 그래프: 전체 LLM
+                사용량.
+              </p>
+            </div>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/report_llm_time.js"></script>
+  </body>
+</html>

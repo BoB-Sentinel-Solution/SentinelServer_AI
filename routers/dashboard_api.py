@@ -197,3 +197,92 @@ def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
         "today_hourly": today_hourly,
         "today_type_ratio": dict(today_type_ratio),
     }
+
+    # ---------- 전체 로그 조회 API (Logs 페이지용) ----------
+@router.get("/logs", dependencies=[Depends(require_admin)])
+def list_logs(
+    page: int = 1,
+    page_size: int = 20,
+    q: str | None = None,
+    category: str | None = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Logs 페이지용 전체 로그 조회 API
+
+    쿼리 파라미터:
+    - page: 페이지 번호(1부터)
+    - page_size: 페이지 크기 (최대 100)
+    - q: 검색 키워드
+    - category: 검색 대상 컬럼
+      - prompt | host | pc_name | public_ip | private_ip | entity
+    """
+    if page < 1:
+        page = 1
+    if page_size < 1:
+        page_size = 20
+    if page_size > 100:
+        page_size = 100
+
+    query = db.query(LogRecord)
+
+    # 검색 필터
+    if q:
+        like = f"%{q}%"
+        cat = (category or "").lower()
+
+        if cat == "prompt":
+            query = query.filter(LogRecord.prompt.ilike(like))
+        elif cat == "host":
+            query = query.filter(LogRecord.host.ilike(like))
+        elif cat == "pc_name":
+            query = query.filter(LogRecord.hostname.ilike(like))
+        elif cat == "public_ip":
+            query = query.filter(LogRecord.public_ip.ilike(like))
+        elif cat == "private_ip":
+            # internal_ip / private_ip 중 프로젝트에 맞는 필드명 사용
+            query = query.filter(LogRecord.internal_ip.ilike(like))
+        elif cat == "entity":
+            # entities 가 JSON(Text)라면 문자열 검색으로 처리
+            query = query.filter(LogRecord.entities_str.ilike(like))  # 필요 시 필드명 조정
+        else:
+            # 카테고리 없으면 여러 컬럼 OR 검색
+            query = query.filter(
+                (LogRecord.prompt.ilike(like))
+                | (LogRecord.host.ilike(like))
+                | (LogRecord.hostname.ilike(like))
+                | (LogRecord.public_ip.ilike(like))
+            )
+
+    query = query.order_by(LogRecord.created_at.desc())
+
+    total = query.count()
+    rows: List[LogRecord] = (
+        query.offset((page - 1) * page_size).limit(page_size).all()
+    )
+
+    items: List[Dict[str, Any]] = []
+    for r in rows:
+        items.append({
+            "id": getattr(r, "request_id", None) or getattr(r, "id", None),
+            "prompt": r.prompt,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "time": r.created_at.isoformat() if r.created_at else None,
+            "host": r.host,
+            "hostname": r.hostname,
+            "public_ip": r.public_ip,
+            "internal_ip": getattr(r, "internal_ip", None),
+            "interface": getattr(r, "interface", None),
+            "action": r.action,
+            "allow": r.allow,
+            "has_sensitive": r.has_sensitive,
+            "file_blocked": r.file_blocked,
+            "entities": r.entities or [],
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }

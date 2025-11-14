@@ -469,3 +469,116 @@
   margin-top: 8px;
   flex: 1 0 auto;
 }
+
+/* 카드 높이 통일: 
+   - card-eq-1 : TODAY'S DETECTION <-> IP 대역별 탐지 건수
+   - card-eq-2 : 시간대별 중요 정보 탐지 유형 <-> 탐지된 중요 정보 유형 비율
+*/
+.card-eq-1,
+.card-eq-2 {
+  height: 260px;        /* 필요하면 240~300 사이로 조절 */
+}
+
+/* 안의 차트가 카드 높이를 넘지 않게 */
+.card-eq-1 canvas,
+.card-eq-2 canvas {
+  max-height: 190px;    /* 제목/여백 고려한 차트 최대 높이 */
+}
+
+/* Logs 페이지 전용 레이아웃 */
+.logs-layout {
+  max-width: 1400px;
+  margin: 20px auto 32px;
+  padding: 0 24px;
+}
+
+.logs-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.logs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.logs-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.logs-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logs-search-input {
+  min-width: 220px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #d0d4e0;
+  font-size: 13px;
+}
+
+.logs-category-select {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #d0d4e0;
+  font-size: 13px;
+  background-color: #fff;
+}
+
+.logs-table-wrapper {
+  max-height: 520px;
+  overflow: auto;
+}
+
+.col-checkbox {
+  width: 32px;
+  text-align: center;
+}
+
+.col-prompt {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logs-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+}
+
+.pager-btn {
+  border: 1px solid #d0d4e0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background-color: #fff;
+  cursor: pointer;
+}
+
+.pager-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pager-info {
+  font-size: 12px;
+  margin: 0 8px;
+}
+
+.logs-empty {
+  text-align: center;
+  padding: 20px 0;
+  font-size: 13px;
+  color: #7b8191;
+}

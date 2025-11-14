@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel Logs</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body class="sentinel-body">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+          <a class="top-menu-item" href="#">Report</a>
+          <a class="top-menu-item top-menu-item--active" href="./logs.html">Logs</a>
+          <a class="top-menu-item" href="#">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <!-- 메인 컨텐츠: 전체 로그 페이지 -->
+    <main class="dashboard-layout logs-layout">
+      <section class="card card-table logs-card">
+        <div class="card-header logs-header">
+          <div class="logs-header-left">
+            <h3 class="card-title">전체 탐지 로그</h3>
+            <span class="card-subtitle">에이전트에서 수집된 모든 요청 로그를 조회합니다.</span>
+          </div>
+
+          <!-- 상단 검색 & 필터 -->
+          <div class="logs-header-right">
+            <div class="logs-search">
+              <input
+                id="logs-search-input"
+                class="logs-search-input"
+                type="text"
+                placeholder="Search for prompt, host, IP..."
+              />
+            </div>
+            <div class="logs-category">
+              <select id="logs-category-select" class="logs-category-select">
+                <option value="">All Categories</option>
+                <option value="prompt">Prompt</option>
+                <option value="host">Host</option>
+                <option value="pc_name">PC Name</option>
+                <option value="public_ip">Public IP</option>
+                <option value="private_ip">Private IP</option>
+                <option value="entity">Entity</option>
+              </select>
+            </div>
+            <button id="logs-search-btn" class="btn btn-small">Search</button>
+          </div>
+        </div>
+
+        <!-- 로그 테이블 -->
+        <div class="table-wrapper logs-table-wrapper">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th class="col-checkbox">
+                  <input type="checkbox" id="logs-check-all" />
+                </th>
+                <th>Prompt</th>
+                <th>Time</th>
+                <th>Host</th>
+                <th>PC Name</th>
+                <th>Public IP</th>
+                <th>Internal IP</th>
+                <th>Interface</th>
+                <th>Action</th>
+                <th>Sensitivity</th>
+                <th>Block flag</th>
+                <th>Entity</th>
+              </tr>
+            </thead>
+            <tbody id="logs-table-body">
+              <!-- JS에서 채움 -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 하단: 페이지네이션 & CSV 버튼 -->
+        <div class="logs-footer">
+          <div class="logs-footer-left">
+            <button id="logs-export-csv" class="btn btn-small btn-ghost">
+              선택 항목 CSV 내보내기
+            </button>
+          </div>
+
+          <div class="logs-footer-right">
+            <button id="logs-page-prev" class="pager-btn" disabled>&lt; Previous</button>
+            <span class="pager-info">
+              Page <span id="logs-page-current">1</span>
+              / <span id="logs-page-total">1</span>
+            </span>
+            <button id="logs-page-next" class="pager-btn" disabled>Next &gt;</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 스크립트 -->
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/logs.js"></script>
+  </body>
+</html>

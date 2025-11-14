@@ -59,14 +59,16 @@
             <canvas id="chart-recent-attempts" height="150"></canvas>
           </div>
 
-          <div class="card">
+          <!-- IP 대역별 탐지 건수: TODAY'S DETECTION 과 높이 맞추기 위해 card-eq-1 추가 -->
+          <div class="card card-eq-1">
             <div class="card-header">
               <h3 class="card-title">IP 대역별 탐지 건수</h3>
             </div>
             <canvas id="chart-ip-band" height="150"></canvas>
           </div>
 
-          <div class="card">
+          <!-- 탐지된 중요 정보 유형 비율: 시간대별 중요 정보 탐지 유형과 높이 맞추기 위해 card-eq-2 추가 -->
+          <div class="card card-eq-2">
             <div class="card-header">
               <h3 class="card-title">탐지된 중요 정보 유형 비율</h3>
             </div>
@@ -76,7 +78,8 @@
 
         <!-- 오른쪽 컬럼 -->
         <div class="dashboard-col dashboard-col--right">
-          <div class="card card-today">
+          <!-- TODAY'S DETECTION: IP 대역별 탐지 건수와 높이 맞추기 위해 card-eq-1 추가 -->
+          <div class="card card-today card-eq-1">
             <div class="card-header card-header--today">
               <div>
                 <div class="badge">TODAY'S DETECTION</div>
@@ -103,7 +106,8 @@
             </div>
           </div>
 
-          <div class="card">
+          <!-- 시간대별 중요 정보 탐지 유형: 탐지된 중요 정보 유형 비율과 높이 맞추기 위해 card-eq-2 추가 -->
+          <div class="card card-eq-2">
             <div class="card-header">
               <h3 class="card-title">시간대별 중요 정보 탐지 유형</h3>
             </div>

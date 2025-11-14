@@ -1,13 +1,14 @@
 # routers/dashboard_api.py
 from __future__ import annotations
 
+import json
 from typing import Dict, List, Any
 from collections import defaultdict
 from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import cast, Text, func  # entities(JSON) 검색 + interface 필터용
+from sqlalchemy import cast, Text, func  # JSON 검색 + interface 필터용
 
 from db import SessionLocal, Base, engine
 from models import LogRecord
@@ -67,10 +68,15 @@ def dashboard_summary(
     - today_hourly: 오늘 시간대별 탐지 건수 [0..23]
     - today_type_ratio: 오늘 탐지된 라벨 비율
 
-    추가:
+    서비스 기반 리포트용:
     - service_usage_by_host: 호스트별 전체 호출 수
     - service_sensitive_by_host: 호스트별 민감정보 탐지 수
     - service_blocked_by_host: 호스트별 차단 수
+
+    파일 기반 리포트용:
+    - file_detect_by_ext: 확장자별(attachment.format) 민감정보 탐지 건수
+    - file_label_by_ext: 확장자+라벨별 탐지 건수
+    - recent_file_logs: 최근 파일 첨부 요청(최대 20건)
 
     interface 파라미터가 주어지면 해당 interface 로그만 집계 (예: LLM, MCP)
     """
@@ -100,9 +106,14 @@ def dashboard_summary(
     ip_band_blocked: Dict[str, int] = defaultdict(int)
 
     # 서비스(호스트)별 집계
-    service_usage_by_host: Dict[str, int] = defaultdict(int)       # 전체 호출 수
-    service_sensitive_by_host: Dict[str, int] = defaultdict(int)   # 민감정보 탐지 수
-    service_blocked_by_host: Dict[str, int] = defaultdict(int)     # 차단 수
+    service_usage_by_host: Dict[str, int] = defaultdict(int)
+    service_sensitive_by_host: Dict[str, int] = defaultdict(int)
+    service_blocked_by_host: Dict[str, int] = defaultdict(int)
+
+    # 파일 기반 집계
+    file_detect_by_ext: Dict[str, int] = defaultdict(int)
+    file_label_by_ext: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    recent_file_logs: List[Dict[str, Any]] = []
 
     # 오늘 기준 통계
     today_sensitive = 0
@@ -121,21 +132,38 @@ def dashboard_summary(
         created_date: date | None = created.date() if created else None
         hour: int | None = created.hour if created else None
 
-        # 공통: 서비스(호스트)별 전체 사용량
+        # ---- 서비스(호스트)별 공통 집계 ----
         host_key = r.host or "unknown"
         service_usage_by_host[host_key] += 1
 
-        # === 공통: 시간대별 "시도" 카운트 (모든 요청) ===
+        # ---- 파일 관련 정보 파싱 (attachment.format) ----
+        file_ext: str | None = None
+        att = r.attachment
+        if att:
+            if isinstance(att, dict):
+                file_ext = (att.get("format") or "").strip().lower() or None
+            elif isinstance(att, str):
+                try:
+                    att_json = json.loads(att)
+                    file_ext = (att_json.get("format") or "").strip().lower() or None
+                except Exception:
+                    file_ext = None
+
+        # ---- 공통: 시간대별 "시도" 카운트 (모든 요청) ----
         if hour is not None and 0 <= hour < 24:
             try:
                 hourly_attempts[hour] += 1
             except Exception:
                 pass
 
+        # ---- 차단 여부 미리 계산 ----
+        action = (r.action or "")
+        is_blocked = (r.allow is False) or action.startswith("block")
+
         # === 탐지 관련 집계 ===
         if r.has_sensitive:
             total_sensitive += 1
-            service_sensitive_by_host[host_key] += 1  # 호스트별 탐지 수
+            service_sensitive_by_host[host_key] += 1
 
             # 유형 비율/탐지 횟수: 엔티티 라벨 기준
             for e in (r.entities or []):
@@ -151,6 +179,10 @@ def dashboard_summary(
                 if created_date == today:
                     today_type_ratio[label] += 1
 
+                # 파일 기반: 확장자+라벨별 카운트
+                if file_ext:
+                    file_label_by_ext[file_ext][label] += 1
+
             # /16 대역 탐지 건수
             if r.public_ip and r.public_ip.count(".") == 3:
                 a, b, *_ = r.public_ip.split(".")
@@ -164,13 +196,14 @@ def dashboard_summary(
                 except Exception:
                     pass
 
-        # === 차단 관련 집계(기존 로직 유지) ===
-        action = (r.action or "")
-        is_blocked = (r.allow is False) or action.startswith("block")
+            # 파일 기반: 확장자별 탐지 건수
+            if file_ext:
+                file_detect_by_ext[file_ext] += 1
 
+        # === 차단 관련 집계(기존 로직 유지) ===
         if is_blocked:
             total_blocked += 1
-            service_blocked_by_host[host_key] += 1  # 호스트별 차단 수
+            service_blocked_by_host[host_key] += 1
 
             if created_date == today:
                 today_blocked += 1
@@ -188,30 +221,41 @@ def dashboard_summary(
 
         # === 최근 로그 20건 (민감값 미노출) ===
         if len(recent_logs) < 20:
-            recent_logs.append(
-                {
-                    "time": r.created_at.isoformat()
-                    if r.created_at
-                    else getattr(r, "time", None),
-                    "host": r.host,
-                    "hostname": r.hostname,
-                    "public_ip": r.public_ip,
-                    "action": r.action,
-                    "has_sensitive": r.has_sensitive,
-                    "file_blocked": r.file_blocked,
-                    "entities": [
-                        {"label": (e.get("label") or "")}
-                        for e in (r.entities or [])
-                    ],
-                    "prompt": (r.prompt[:120] + "…")
-                    if r.prompt and len(r.prompt) > 120
-                    else (r.prompt or ""),
-                }
-            )
+            recent_logs.append({
+                "time": r.created_at.isoformat() if r.created_at else getattr(r, "time", None),
+                "host": r.host,
+                "hostname": r.hostname,
+                "public_ip": r.public_ip,
+                "action": r.action,
+                "has_sensitive": r.has_sensitive,
+                "file_blocked": r.file_blocked,
+                "entities": [{"label": (e.get("label") or "")} for e in (r.entities or [])],
+                "prompt": (r.prompt[:120] + "…") if r.prompt and len(r.prompt) > 120 else (r.prompt or ""),
+            })
+
+        # === 최근 파일 로그 20건 (첨부 있는 경우만) ===
+        if file_ext and len(recent_file_logs) < 20:
+            recent_file_logs.append({
+                "time": r.created_at.isoformat() if r.created_at else getattr(r, "time", None),
+                "host": r.host,
+                "hostname": r.hostname,
+                "public_ip": r.public_ip,
+                "private_ip": r.private_ip,
+                "action": r.action,
+                "has_sensitive": r.has_sensitive,
+                "file_blocked": r.file_blocked,
+                "blocked": is_blocked,
+                "file_ext": file_ext,
+            })
 
     # hourly_type 은 {시간(int): {라벨:카운트}} → JSON 직렬화 위해 키를 문자열로
     hourly_type_serialized: Dict[str, Dict[str, int]] = {
         str(h): dict(type_counts) for h, type_counts in hourly_type.items()
+    }
+
+    # file_label_by_ext 도 dict 로 변환
+    file_label_by_ext_serialized: Dict[str, Dict[str, int]] = {
+        ext: dict(label_counts) for ext, label_counts in file_label_by_ext.items()
     }
 
     return {
@@ -231,6 +275,11 @@ def dashboard_summary(
         "service_usage_by_host": dict(service_usage_by_host),
         "service_sensitive_by_host": dict(service_sensitive_by_host),
         "service_blocked_by_host": dict(service_blocked_by_host),
+
+        # 파일 기반 통계
+        "file_detect_by_ext": dict(file_detect_by_ext),
+        "file_label_by_ext": file_label_by_ext_serialized,
+        "recent_file_logs": recent_file_logs,
 
         # 오늘 기준 통계
         "today_sensitive": today_sensitive,
@@ -305,24 +354,22 @@ def list_logs(
 
     items: List[Dict[str, Any]] = []
     for r in rows:
-        items.append(
-            {
-                "id": getattr(r, "request_id", None),
-                "prompt": r.prompt,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
-                "time": r.created_at.isoformat() if r.created_at else None,
-                "host": r.host,
-                "hostname": r.hostname,
-                "public_ip": r.public_ip,
-                "internal_ip": r.private_ip,  # 프론트에서는 Internal IP/Private IP 컬럼으로 사용
-                "interface": r.interface,
-                "action": r.action,
-                "allow": r.allow,
-                "has_sensitive": r.has_sensitive,
-                "file_blocked": r.file_blocked,
-                "entities": r.entities or [],
-            }
-        )
+        items.append({
+            "id": getattr(r, "request_id", None),
+            "prompt": r.prompt,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "time": r.created_at.isoformat() if r.created_at else None,
+            "host": r.host,
+            "hostname": r.hostname,
+            "public_ip": r.public_ip,
+            "internal_ip": r.private_ip,            # 프론트에서는 Internal IP/Private IP 컬럼으로 사용
+            "interface": r.interface,
+            "action": r.action,
+            "allow": r.allow,
+            "has_sensitive": r.has_sensitive,
+            "file_blocked": r.file_blocked,
+            "entities": r.entities or [],
+        })
 
     return {
         "items": items,

@@ -1,6 +1,8 @@
 # routers/dashboard_api.py
 from __future__ import annotations
 
+from sqlalchemy import cast, Text, func
+
 from typing import Dict, List, Any
 from collections import defaultdict
 from datetime import datetime, date
@@ -74,7 +76,9 @@ def dashboard_summary(
     # --- 쿼리 구성: interface 있으면 필터 ---
     query = db.query(LogRecord)
     if interface:
-        query = query.filter(LogRecord.interface == interface)
+        # 앞뒤 공백 제거 + 소문자로 통일해서 비교
+        q_interface = interface.strip().lower()
+        query = query.filter(func.lower(LogRecord.interface) == q_interface)
 
     rows: List[LogRecord] = (
         query.order_by(LogRecord.created_at.desc()).all()

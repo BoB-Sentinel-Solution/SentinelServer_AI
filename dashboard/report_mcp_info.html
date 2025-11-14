@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel Report · MCP Overall</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+
+  <body class="sentinel-body">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+          <a class="top-menu-item top-menu-item--active" href="./report.html">Report</a>
+          <a class="top-menu-item" href="./logs.html">Logs</a>
+          <a class="top-menu-item" href="#">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <main class="report-layout">
+      <!-- LLM / MCP 탭 -->
+      <section class="report-tabs-row">
+        <div class="report-tabs">
+          <a class="report-tab" href="./report.html">LLM</a>
+          <a class="report-tab report-tab--active" href="./report_mcp_info.html">MCP</a>
+        </div>
+      </section>
+
+      <section class="report-content">
+        <!-- 좌측 사이드바 -->
+        <aside class="report-sidebar">
+          <div class="report-sidebar-inner">
+
+            <!-- OVERALL (현재 그룹) -->
+            <div class="side-group">
+              <div class="side-group-title">| OVERALL</div>
+              <a class="side-link side-link--active" href="./report_mcp_info.html">
+                MCP 서버 사용 순위
+              </a>
+              <a class="side-link" href="./report_mcp_info.html#usage">
+                MCP 사용량
+              </a>
+            </div>
+
+            <!-- INFORMATION BASED (향후 페이지용 링크만) -->
+            <div class="side-group">
+              <div class="side-group-title">| INFORMATION BASED</div>
+              <a class="side-link" href="./report_mcp_info.html#info-detect">중요정보 탐지</a>
+              <a class="side-link" href="./report_mcp_info.html#info-service">서비스별 중요 정보 탐지</a>
+              <a class="side-link" href="./report_mcp_info.html#info-trend">MCP 사용량 추이</a>
+            </div>
+
+            <!-- CONFIG (향후 페이지용 링크만) -->
+            <div class="side-group">
+              <div class="side-group-title">| CONFIG</div>
+              <a class="side-link" href="./report_mcp_info.html#cfg-count">활성화된 MCP 개수</a>
+              <a class="side-link" href="./report_mcp_info.html#cfg-type">
+                활성화된 MCP의 타입 분포
+              </a>
+              <a class="side-link" href="./report_mcp_info.html#cfg-updated">
+                시간대별 업데이트된 MCP 목록
+              </a>
+              <a class="side-link" href="./report_mcp_info.html#cfg-host">
+                호스트별 활성 MCP 개수 순위
+              </a>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 메인 카드 영역 -->
+        <section class="report-main">
+          <!-- 1행 : MCP 서비스별 사용 순위 + LLM/MCP 사용 비중 -->
+          <div class="report-row report-row--top">
+            <!-- MCP 서비스별 사용 순위 (도넛) -->
+            <article class="card report-card report-card--half">
+              <header class="card-header">
+                <h3 class="card-title">MCP 서비스별 사용 순위</h3>
+                <span class="card-subtitle">
+                  최근 로그 기준, host / hostname 별 호출 건수
+                </span>
+              </header>
+              <div class="card-body card-body--center">
+                <canvas id="chart-mcp-service-rank" height="220"></canvas>
+                <p class="card-note" id="mcp-service-empty" style="display:none;">
+                  아직 MCP 로그가 없습니다.
+                </p>
+              </div>
+            </article>
+
+            <!-- MCP 사용량 비율 (LLM vs MCP) -->
+            <article class="card report-card report-card--half" id="usage">
+              <header class="card-header">
+                <h3 class="card-title">MCP 사용량 비율</h3>
+                <span class="card-subtitle">LLM과 MCP 사용 비중</span>
+              </header>
+              <div class="card-body">
+                <canvas id="chart-mcp-usage-ratio" height="220"></canvas>
+              </div>
+            </article>
+          </div>
+
+          <!-- 2행 : MCP 사용량 추이 + 외부/내부 MCP 비중 -->
+          <div class="report-row">
+            <!-- MCP 사용량 추이 (시간대별) -->
+            <article class="card report-card report-card--half">
+              <header class="card-header">
+                <h3 class="card-title">MCP 사용량 추이</h3>
+                <span class="card-subtitle">시간대별 MCP 호출 건수</span>
+              </header>
+              <div class="card-body">
+                <canvas id="chart-mcp-usage-trend" height="230"></canvas>
+              </div>
+            </article>
+
+            <!-- 외부 MCP와 내부 MCP 비중 -->
+            <article class="card report-card report-card--half">
+              <header class="card-header">
+                <h3 class="card-title">외부 MCP와 내부 MCP 비중</h3>
+                <span class="card-subtitle">
+                  MCP 로그의 Public IP 기준 (사설 대역 = 내부)
+                </span>
+              </header>
+              <div class="card-body card-body--center">
+                <canvas id="chart-mcp-int-ext" height="230"></canvas>
+                <p class="card-note" id="mcp-int-ext-empty" style="display:none;">
+                  IP 정보가 있는 MCP 로그가 없습니다.
+                </p>
+              </div>
+            </article>
+          </div>
+
+          <!-- 3행 : MCP 서버별 사용량 + Prediction -->
+          <div class="report-row report-row--bottom">
+            <!-- MCP 서버별 사용량 (bar) -->
+            <article class="card report-card report-card--half">
+              <header class="card-header">
+                <h3 class="card-title">MCP 서버별 사용량 추이</h3>
+                <span class="card-subtitle">
+                  최근 MCP 로그 기준, 서비스(host) 별 호출 건수
+                </span>
+              </header>
+              <div class="card-body">
+                <canvas id="chart-mcp-service-usage" height="220"></canvas>
+              </div>
+            </article>
+
+            <!-- Prediction 카드 (텍스트) -->
+            <article class="card report-card report-card--half">
+              <header class="card-header">
+                <h3 class="card-title">PREDICTION</h3>
+              </header>
+              <div class="card-body prediction-body">
+                <p>
+                  최근 MCP 서비스의 특정 엔드포인트에서
+                  <strong>전화번호·계정 정보</strong>가 반복적으로 탐지되고 있습니다.
+                </p>
+                <p>
+                  동일한 패턴이 지속될 경우,
+                  <strong>특정 MCP 서버에 대한 접근 제한·정책 강화</strong>가
+                  필요할 수 있습니다.
+                </p>
+                <p>
+                  Sentinel Solution은 서비스별 사용량·탐지 현황을 기반으로
+                  <strong>위험도가 높은 MCP</strong>를 빠르게 식별하고
+                  추가 규칙 적용에 활용할 수 있습니다.
+                </p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/report_mcp_info.js"></script>
+  </body>
+</html>

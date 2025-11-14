@@ -18,7 +18,7 @@
         </div>
 
         <nav class="top-menu">
-          <a class="top-menu-item top-menu-item--active" href="./dashboard.html">Dashboard</a>
+          <a class="top-menu-item top-menu-item--active">Dashboard</a>
           <a class="top-menu-item" href="./report.html">Report</a>
           <a class="top-menu-item" href="./logs.html">Logs</a>
           <a class="top-menu-item" href="#">Settings</a>
@@ -50,7 +50,7 @@
 
       <!-- 좌/우 2컬럼 레이아웃 -->
       <section class="dashboard-main">
-        <!-- 왼쪽 컬럼 -->
+        <!-- 왼쪽 컬럼 : 최근 시도 / IP 대역 -->
         <div class="dashboard-col">
           <div class="card">
             <div class="card-header">
@@ -59,27 +59,17 @@
             <canvas id="chart-recent-attempts" height="150"></canvas>
           </div>
 
-          <!-- IP 대역별 탐지 건수: TODAY'S DETECTION 과 높이 맞추기 위해 card-eq-1 추가 -->
-          <div class="card card-eq-1">
+          <div class="card">
             <div class="card-header">
               <h3 class="card-title">IP 대역별 탐지 건수</h3>
             </div>
             <canvas id="chart-ip-band" height="150"></canvas>
           </div>
-
-          <!-- 탐지된 중요 정보 유형 비율: 시간대별 중요 정보 탐지 유형과 높이 맞추기 위해 card-eq-2 추가 -->
-          <div class="card card-eq-2">
-            <div class="card-header">
-              <h3 class="card-title">탐지된 중요 정보 유형 비율</h3>
-            </div>
-            <canvas id="chart-type-ratio" height="180"></canvas>
-          </div>
         </div>
 
-        <!-- 오른쪽 컬럼 -->
+        <!-- 오른쪽 컬럼 : TODAY + 탐지된 중요 정보 유형 비율 -->
         <div class="dashboard-col dashboard-col--right">
-          <!-- TODAY'S DETECTION: IP 대역별 탐지 건수와 높이 맞추기 위해 card-eq-1 추가 -->
-          <div class="card card-today card-eq-1">
+          <div class="card card-today">
             <div class="card-header card-header--today">
               <div>
                 <div class="badge">TODAY'S DETECTION</div>
@@ -106,14 +96,23 @@
             </div>
           </div>
 
-          <!-- 시간대별 중요 정보 탐지 유형: 탐지된 중요 정보 유형 비율과 높이 맞추기 위해 card-eq-2 추가 -->
-          <div class="card card-eq-2">
+          <!-- 원래 아래에 있던 '탐지된 중요 정보 유형 비율' 카드를
+               오른쪽 컬럼으로 올려서 시안처럼 배치 -->
+          <div class="card">
             <div class="card-header">
-              <h3 class="card-title">시간대별 중요 정보 탐지 유형</h3>
+              <h3 class="card-title">탐지된 중요 정보 유형 비율</h3>
             </div>
-            <canvas id="chart-hourly-type" height="160"></canvas>
+            <canvas id="chart-type-ratio" height="180"></canvas>
           </div>
         </div>
+      </section>
+
+      <!-- 하단 : 시간대별 중요 정보 탐지 유형 (가로로 넓게) -->
+      <section class="card">
+        <div class="card-header">
+          <h3 class="card-title">시간대별 중요 정보 탐지 유형</h3>
+        </div>
+        <canvas id="chart-hourly-type" height="160"></canvas>
       </section>
 
       <!-- 하단 로그 테이블 -->

@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from typing import Dict, List, Any
 from collections import defaultdict
-from datetime import datetime, date  # ★ 추가
+from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import cast, Text  # ★ entities 검색용
 
 from db import SessionLocal, Base, engine
 from models import LogRecord
@@ -198,7 +199,8 @@ def dashboard_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
         "today_type_ratio": dict(today_type_ratio),
     }
 
-    # ---------- 전체 로그 조회 API (Logs 페이지용) ----------
+
+# ---------- 전체 로그 조회 API (Logs 페이지용) ----------
 @router.get("/logs", dependencies=[Depends(require_admin)])
 def list_logs(
     page: int = 1,
@@ -240,11 +242,10 @@ def list_logs(
         elif cat == "public_ip":
             query = query.filter(LogRecord.public_ip.ilike(like))
         elif cat == "private_ip":
-            # internal_ip / private_ip 중 프로젝트에 맞는 필드명 사용
-            query = query.filter(LogRecord.internal_ip.ilike(like))
+            query = query.filter(LogRecord.private_ip.ilike(like))
         elif cat == "entity":
-            # entities 가 JSON(Text)라면 문자열 검색으로 처리
-            query = query.filter(LogRecord.entities_str.ilike(like))  # 필요 시 필드명 조정
+            # entities(JSON) 문자열 검색
+            query = query.filter(cast(LogRecord.entities, Text).ilike(like))
         else:
             # 카테고리 없으면 여러 컬럼 OR 검색
             query = query.filter(
@@ -252,6 +253,7 @@ def list_logs(
                 | (LogRecord.host.ilike(like))
                 | (LogRecord.hostname.ilike(like))
                 | (LogRecord.public_ip.ilike(like))
+                | (LogRecord.private_ip.ilike(like))
             )
 
     query = query.order_by(LogRecord.created_at.desc())
@@ -264,15 +266,15 @@ def list_logs(
     items: List[Dict[str, Any]] = []
     for r in rows:
         items.append({
-            "id": getattr(r, "request_id", None) or getattr(r, "id", None),
+            "id": getattr(r, "request_id", None),
             "prompt": r.prompt,
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "time": r.created_at.isoformat() if r.created_at else None,
             "host": r.host,
             "hostname": r.hostname,
             "public_ip": r.public_ip,
-            "internal_ip": getattr(r, "internal_ip", None),
-            "interface": getattr(r, "interface", None),
+            "internal_ip": r.private_ip,            # 프론트에서는 Internal IP/Private IP 컬럼으로 사용
+            "interface": r.interface,
             "action": r.action,
             "allow": r.allow,
             "has_sensitive": r.has_sensitive,

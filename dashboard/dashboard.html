@@ -7,6 +7,155 @@
 
     <link rel="stylesheet" href="./vendor/reset.min.css" />
     <link rel="stylesheet" href="./css/styles.css" />
+
+    <!-- 레이아웃 + TODAY'S DETECTION 카드 전용 스타일 -->
+    <style>
+      /* ===== 메인 그리드 레이아웃 ===== */
+      @media (min-width: 992px) {
+        .dashboard-main-grid {
+          display: grid;
+          grid-template-columns: 1.1fr 1.1fr;
+          /* 1행: 최근 시도 / TODAY 상단, 2행: IP / TODAY 하단, 3행: 유형 비율 / 시간대별 유형 */
+          grid-template-rows: repeat(3, minmax(260px, auto));
+          grid-column-gap: 24px;
+          grid-row-gap: 24px;
+        }
+
+        .card-recent-attempts {
+          grid-column: 1;
+          grid-row: 1;
+        }
+
+        .card-ip-band {
+          grid-column: 1;
+          grid-row: 2;
+        }
+
+        /* TODAY'S DETECTION 카드가 1~2행 전체를 차지 → 왼쪽 두 카드와 같은 높이 */
+        .card-today-detection {
+          grid-column: 2;
+          grid-row: 1 / span 2;
+        }
+
+        .card-type-ratio {
+          grid-column: 1;
+          grid-row: 3;
+        }
+
+        .card-hourly-type {
+          grid-column: 2;
+          grid-row: 3;
+        }
+      }
+
+      /* 모바일 / 태블릿에서는 세로로 쌓기 */
+      @media (max-width: 991.98px) {
+        .dashboard-main-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+      }
+
+      /* ===== TODAY'S DETECTION 카드 비주얼 ===== */
+      .card-today {
+        background: linear-gradient(135deg, #3b82f6 0%, #1e3a8a 45%, #020617 100%);
+        color: #ffffff;
+        border-radius: 20px;
+        padding: 20px 24px;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .card-header--today {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+      }
+
+      .card-header--today .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        font-weight: 600;
+      }
+
+      .card-header--today .today-metrics {
+        margin-top: 10px;
+        display: flex;
+        gap: 12px;
+        font-size: 13px;
+      }
+
+      .card-header--today .today-metrics strong {
+        font-size: 18px;
+        font-weight: 700;
+        margin-right: 4px;
+      }
+
+      .card-header--today .today-date {
+        text-align: right;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      .card-header--today #today-date {
+        font-size: 20px;
+      }
+
+      .card-header--today #today-time {
+        font-size: 13px;
+        opacity: 0.85;
+      }
+
+      .card-body-today {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex: 1;
+      }
+
+      .card-today-chart {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 12px 16px 14px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.25);
+        color: #111827;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .card-today-chart + .card-today-chart {
+        margin-top: 4px;
+      }
+
+      .card-today-chart .card-subtitle {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+
+      .card-today-chart canvas {
+        width: 100% !important;
+        height: 130px;
+      }
+
+      /* 데스크톱에서 TODAY 카드 내부 캔버스 비율 조금 키우기 */
+      @media (min-width: 1200px) {
+        .card-today-chart canvas {
+          height: 150px;
+        }
+      }
+    </style>
   </head>
   <body class="sentinel-body">
     <!-- 상단 네비게이션 바 -->
@@ -18,10 +167,10 @@
         </div>
 
         <nav class="top-menu">
-          <a class="top-menu-item top-menu-item--active">Dashboard</a>
+          <a class="top-menu-item top-menu-item--active" href="./dashboard.html">Dashboard</a>
           <a class="top-menu-item" href="./report.html">Report</a>
           <a class="top-menu-item" href="./logs.html">Logs</a>
-          <a class="top-menu-item" href="#">Settings</a>
+          <a class="top-menu-item" href="./settings.html">Settings</a>
         </nav>
       </div>
 
@@ -48,71 +197,67 @@
         </div>
       </section>
 
-      <!-- 좌/우 2컬럼 레이아웃 -->
-      <section class="dashboard-main">
-        <!-- 왼쪽 컬럼 : 최근 시도 / IP 대역 -->
-        <div class="dashboard-col">
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">최근 개인정보(식별대상) 입력 시도 횟수</h3>
+      <!-- 가운데 메인 그리드 -->
+      <section class="dashboard-main-grid">
+        <!-- 최근 개인정보(식별대상) 입력 시도 횟수 -->
+        <div class="card card-recent-attempts">
+          <div class="card-header">
+            <h3 class="card-title">최근 개인정보(식별대상) 입력 시도 횟수</h3>
+          </div>
+          <canvas id="chart-recent-attempts" height="150"></canvas>
+        </div>
+
+        <!-- TODAY'S DETECTION : 왼쪽 1,2행과 같은 전체 높이 -->
+        <div class="card card-today card-today-detection">
+          <div class="card-header card-header--today">
+            <div>
+              <div class="badge">TODAY'S DETECTION</div>
+              <div class="today-metrics">
+                <span><strong id="today-detected">-</strong> 중요정보 탐지</span>
+                <span><strong id="today-blocked">-</strong> 차단</span>
+              </div>
             </div>
-            <canvas id="chart-recent-attempts" height="150"></canvas>
+            <div class="today-date">
+              <div id="today-date">--/--</div>
+              <div id="today-time">--:--:--</div>
+            </div>
           </div>
 
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">IP 대역별 탐지 건수</h3>
+          <div class="card-body-today">
+            <div class="card-today-chart">
+              <h4 class="card-subtitle">금일 시간대별 탐지 건수</h4>
+              <canvas id="chart-today-hourly"></canvas>
             </div>
-            <canvas id="chart-ip-band" height="150"></canvas>
+            <div class="card-today-chart">
+              <h4 class="card-subtitle">금일 탐지된 중요 정보 유형 비율</h4>
+              <canvas id="chart-today-type"></canvas>
+            </div>
           </div>
         </div>
 
-        <!-- 오른쪽 컬럼 : TODAY + 탐지된 중요 정보 유형 비율 -->
-        <div class="dashboard-col dashboard-col--right">
-          <div class="card card-today">
-            <div class="card-header card-header--today">
-              <div>
-                <div class="badge">TODAY'S DETECTION</div>
-                <div class="today-metrics">
-                  <span><strong id="today-detected">-</strong> 중요정보 탐지</span>
-                  <span><strong id="today-blocked">-</strong> 차단</span>
-                </div>
-              </div>
-              <div class="today-date">
-                <div id="today-date">--/--</div>
-                <div id="today-time">--:--:--</div>
-              </div>
-            </div>
-
-            <div class="card-body-today">
-              <div class="card-today-chart">
-                <h4 class="card-subtitle">금일 시간대별 탐지 건수</h4>
-                <canvas id="chart-today-hourly" height="120"></canvas>
-              </div>
-              <div class="card-today-chart">
-                <h4 class="card-subtitle">금일 탐지된 중요 정보 유형 비율</h4>
-                <canvas id="chart-today-type" height="160"></canvas>
-              </div>
-            </div>
+        <!-- IP 대역별 탐지 건수 -->
+        <div class="card card-ip-band">
+          <div class="card-header">
+            <h3 class="card-title">IP 대역별 탐지 건수</h3>
           </div>
+          <canvas id="chart-ip-band" height="150"></canvas>
+        </div>
 
-          <!-- 원래 아래에 있던 '탐지된 중요 정보 유형 비율' 카드를
-               오른쪽 컬럼으로 올려서 시안처럼 배치 -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">탐지된 중요 정보 유형 비율</h3>
-            </div>
-            <canvas id="chart-type-ratio" height="180"></canvas>
+        <!-- 탐지된 중요 정보 유형 비율 -->
+        <div class="card card-type-ratio">
+          <div class="card-header">
+            <h3 class="card-title">탐지된 중요 정보 유형 비율</h3>
           </div>
+          <canvas id="chart-type-ratio" height="180"></canvas>
         </div>
-      </section>
 
-      <!-- 하단 : 시간대별 중요 정보 탐지 유형 (가로로 넓게) -->
-      <section class="card">
-        <div class="card-header">
-          <h3 class="card-title">시간대별 중요 정보 탐지 유형</h3>
+        <!-- 시간대별 중요 정보 탐지 유형 -->
+        <div class="card card-hourly-type">
+          <div class="card-header">
+            <h3 class="card-title">시간대별 중요 정보 탐지 유형</h3>
+          </div>
+          <canvas id="chart-hourly-type" height="160"></canvas>
         </div>
-        <canvas id="chart-hourly-type" height="160"></canvas>
       </section>
 
       <!-- 하단 로그 테이블 -->

@@ -85,8 +85,8 @@ PATTERNS = {
     # DRIVER_LICENSE
     "DRIVER_LICENSE": re.compile(r"(?<!\d)\d{2}-\d{2}-\d{6}-\d{2}(?!\d)"),
 
-    # FOREIGNER_ID (외국인등록번호)
-    "FOREIGNER_ID": re.compile(r"""
+# FOREIGNER_ID (외국인등록번호)
+"FOREIGNER_ID": re.compile(r"""
 (?x)
 (?<!\d)
 (?: (?:0[1-9]|[1-9]\d)
@@ -100,14 +100,14 @@ PATTERNS = {
 (?!\d)
 """, X),
 
-    # BUSINESS_ID (사업자등록번호)
-    "BUSINESS_ID": re.compile(r"(?<!\d)\d{3}-\d{2}-\d{5}(?!\d)"),
+# BUSINESS_ID (사업자등록번호)
+"BUSINESS_ID": re.compile(r"(?<!\d)\d{3}-\d{2}-\d{5}(?!\d)"),
 
-    # MILITARY_ID (군번)
-    "MILITARY_ID": re.compile(r"(?<![A-Za-z0-9])\d{2}-(?:\d{6}|\d{7}|\d{8})(?![A-Za-z0-9])"),
+# MILITARY_ID (군번)
+"MILITARY_ID": re.compile(r"(?<![A-Za-z0-9])\d{2}-(?:\d{6}|\d{7}|\d{8})(?![A-Za-z0-9])"),
 
-    # API_KEY (구글/오픈AI/카카오)
-    "API_KEY": re.compile(r"""
+# API_KEY (구글/오픈AI/카카오)
+"API_KEY": re.compile(r"""
 (?x)
 (?<![A-Za-z0-9])
 (?:

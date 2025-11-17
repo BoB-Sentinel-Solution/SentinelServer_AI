@@ -13,7 +13,8 @@ S = re.DOTALL
 # 정규식 패턴
 # ---------------------------
 PATTERNS = {
-    # PHONE (전화번호)
+
+# PHONE (전화번호)
 "PHONE": re.compile(r"""
 (?x)
 (?<!\d)
@@ -37,8 +38,8 @@ PATTERNS = {
 (?!\d)
 """, re.VERBOSE),
 
-    # EMAIL — Python 호환(가변폭 lookbehind 제거), 경계 소비 방식
-    "EMAIL": re.compile(r"""
+# EMAIL — Python 호환(가변폭 lookbehind 제거), 경계 소비 방식
+"EMAIL": re.compile(r"""
 (?:^|[\s<\(\["':.,;!?=]|[가-힣])     # 앞 경계(소비)
 (?:
   # 1) "표시명" + <이메일>
@@ -61,11 +62,11 @@ PATTERNS = {
 (?=$|[\s>\)\]"':.,;!?=]|[가-힣])      # 뒤 경계(lookahead)
 """, re.X | re.I),
 
-    # PERSONAL_CUSTOMS_ID (개인통관고유부호)
-    "PERSONAL_CUSTOMS_ID": re.compile(r"(?i)\bP-?\d{12}\b"),
+# PERSONAL_CUSTOMS_ID (개인통관고유부호)
+"PERSONAL_CUSTOMS_ID": re.compile(r"(?i)\bP-?\d{12}\b"),
 
-    # RESIDENT_ID (주민등록번호)
-    "RESIDENT_ID": re.compile(r"""
+# RESIDENT_ID (주민등록번호)
+"RESIDENT_ID": re.compile(r"""
 (?x)
 (?<!\d)
 (?: (?:0[1-9]|[1-9]\d)
@@ -79,11 +80,11 @@ PATTERNS = {
 (?!\d)
 """, X),
 
-    # PASSPORT
-    "PASSPORT": re.compile(r"\b(?:[A-Z]\d{8}|[A-Z]{2}\d{7})\b"),
+# PASSPORT
+"PASSPORT": re.compile(r"\b(?:[A-Z]\d{8}|[A-Z]{2}\d{7})\b"),
 
-    # DRIVER_LICENSE
-    "DRIVER_LICENSE": re.compile(r"(?<!\d)\d{2}-\d{2}-\d{6}-\d{2}(?!\d)"),
+# DRIVER_LICENSE
+"DRIVER_LICENSE": re.compile(r"(?<!\d)\d{2}-\d{2}-\d{6}-\d{2}(?!\d)"),
 
 # FOREIGNER_ID (외국인등록번호)
 "FOREIGNER_ID": re.compile(r"""
@@ -120,8 +121,8 @@ PATTERNS = {
 (?![A-Za-z0-9])
 """, X),
 
-    # GITHUB_PAT
-    "GITHUB_PAT": re.compile(r"""
+# GITHUB_PAT
+"GITHUB_PAT": re.compile(r"""
 (?xi)
 (?<![0-9A-Za-z])
 (?:
@@ -132,7 +133,7 @@ PATTERNS = {
 (?![0-9A-Za-z])
 """, X | I),
 
-    "PRIVATE_KEY": re.compile(r"""
+"PRIVATE_KEY": re.compile(r"""
 ^-----BEGIN OPENSSH PRIVATE KEY-----\r?\n[A-Za-z0-9+/=\r\n]+^-----END OPENSSH PRIVATE KEY-----$
 |
 ^-----BEGIN (?:RSA|EC|DSA) PRIVATE KEY-----\r?\n(?:[A-Za-z0-9+/=\r\n]+)^-----END (?:RSA|EC|DSA) PRIVATE KEY-----$
@@ -142,17 +143,17 @@ PATTERNS = {
 ^-----BEGIN PGP PRIVATE KEY BLOCK-----\r?\n[\s\S]+?^-----END PGP PRIVATE KEY BLOCK-----$
 """, M | S),
 
-    # CARD_NUMBER (루한은 후처리)
-    "CARD_NUMBER": re.compile(r"(?x)(?<!\d)(?:\d[ -]?){13,19}(?!\d)"),
+# CARD_NUMBER (루한은 후처리)
+"CARD_NUMBER": re.compile(r"(?x)(?<!\d)(?:\d[ -]?){13,19}(?!\d)"),
 
-    # IMEI (루한은 후처리)
-    "IMEI": re.compile(r"(?x)(?<!\d)(?:\d[ -]?){15}(?!\d)"),
+# IMEI (루한은 후처리)
+"IMEI": re.compile(r"(?x)(?<!\d)(?:\d[ -]?){15}(?!\d)"),
 
-    # CARD_EXPIRY (선택)
-    "CARD_EXPIRY": re.compile(r"(?x)(0[1-9]|1[0-2])\s*[\/\-]\s*(?:\d{2}|\d{4})"),
+# CARD_EXPIRY (선택)
+"CARD_EXPIRY": re.compile(r"(?x)(0[1-9]|1[0-2])\s*[\/\-]\s*(?:\d{2}|\d{4})"),
 
-    # BANK_ACCOUNT (국내 예시들 – 포맷 다양, 과탐 가능)
-    "BANK_ACCOUNT": re.compile(r"""
+# BANK_ACCOUNT (국내 예시들 – 포맷 다양, 과탐 가능)
+"BANK_ACCOUNT": re.compile(r"""
 (?x)
 (?<!\d)
 (?:
@@ -195,11 +196,11 @@ PATTERNS = {
 (?!\d)
 """, X),
 
-    # HD_WALLET (xpub/xprv…)
-    "HD_WALLET": re.compile(r"\b(?:xpub|ypub|zpub|tpub|xprv|yprv|zprv|tprv)[1-9A-HJ-NP-Za-km-z]{80,108}\b"),
+# HD_WALLET (xpub/xprv…)
+"HD_WALLET": re.compile(r"\b(?:xpub|ypub|zpub|tpub|xprv|yprv|zprv|tprv)[1-9A-HJ-NP-Za-km-z]{80,108}\b"),
 
-    # PAYMENT_URI_QR: Bitcoin/Ethereum 예시
-    "PAYMENT_URI_QR": re.compile(r"""
+# PAYMENT_URI_QR: Bitcoin/Ethereum 예시
+"PAYMENT_URI_QR": re.compile(r"""
 (?x)
 \b(?: # BTC BIP-21 (legacy/segwit/bech32)
    bitcoin:(?:[13mn][1-9A-HJ-NP-Za-km-z]{25,34}|bc1[ac-hj-np-z02-9]{11,71})(?:\?[A-Za-z0-9%&=_+.\-]+)?
@@ -208,8 +209,8 @@ PATTERNS = {
 )\b
 """, X | I),
 
-    # IPV4 (CIDR/포트)
-    "IPV4": re.compile(r"""
+# IPV4 (CIDR/포트)
+"IPV4": re.compile(r"""
 (?x)
 (?<!\d)
 (?:
@@ -223,9 +224,9 @@ PATTERNS = {
 (?!\d)
 """, X),
 
-    # IPV6 (대괄호/비대괄호, zone-id, CIDR, 포트)
-    "IPV6": re.compile(r"""
-(
+# IPV6 (대괄호/비대괄호, zone-id, CIDR, 포트)
+"IPV6": re.compile(r"""
+(?:
   \[
     (?:
       (?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}|
@@ -237,16 +238,17 @@ PATTERNS = {
       (?:[A-Fa-f0-9]{1,4}:){1,3}(?::[A-Fa-f0-9]{1,4}){1,4}|
       (?:[A-Fa-f0-9]{1,4}:){1,2}(?::[A-Fa-f0-9]{1,4}){1,5}|
       [A-Fa-f0-9]{1,4}:(?:(?::[A-Fa-f0-9]{1,4}){1,6})|
-      :(?:(?::[A-Fa-f0-9]{1,4}){1,7}|:)|
-      (?:[A-Fa-f0-9]{1,4}:){1,4}(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)
+      :(?:(?::[A-Fa-f0-9]{1,4}){1,7}|:)|                                         
+      (?:[A-Fa-f0-9]{1,4}:){1,4}
+        (?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}
+        (?:25[0-5]|2[0-4]\d|1?\d?\d)
     )
     (?:%[0-9A-Za-z.\-_:]+)?
   \]
-  (?:/(?:12[0-8]|1[01]\d|\d{1,2}))?(?::(?:6553[0-5]|655[0-2]\d|65[0-4]\d{2}|6[0-4]\d{3}|[1-5]?\d{1,4}))?
-)
+  (?:/(?:12[0-8]|1[01]\d|\d{1,2}))?
+  (?::(?:6553[0-5]|655[0-2]\d|65[0-4]\d{2}|6[0-4]\d{3}|[1-5]?\d{1,4}))?
 |
-(
-  (?<![:\w])
+  (?<![0-9A-Fa-f:])   # ← 좌측: hex/콜론과 바로 붙어 있으면 제외 (다른 토큰 중간 방지)
   (?:
     (?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}|
     (?:[A-Fa-f0-9]{1,4}:){1,7}:|
@@ -254,18 +256,20 @@ PATTERNS = {
     (?:[A-Fa-f0-9]{1,4}:){1,6}:[A-Fa-f0-9]{1,4}|
     (?:[A-Fa-f0-9]{1,4}:){1,5}(?::[A-Fa-f0-9]{1,4}){1,2}|
     (?:[A-Fa-f0-9]{1,4}:){1,4}(?::[A-Fa-f0-9]{1,4}){1,3}|
-    (?:[A-Fa-f0-9]{1,3}[A-Fa-f0-9]?:){1,2}(?::[A-Fa-f0-9]{1,4}){1,5}|  # relax 한변
+    (?:[A-Fa-f0-9]{1,4}:){1,3}(?::[A-Fa-f0-9]{1,4}){1,4}|   # ← relax 버전 대신 정석 hextet
+    (?:[A-Fa-f0-9]{1,4}:){1,2}(?::[A-Fa-f0-9]{1,4}){1,5}|
     [A-Fa-f0-9]{1,4}:(?:(?::[A-Fa-f0-9]{1,4}){1,6})|
     :(?:(?::[A-Fa-f0-9]{1,4}){1,7}|:)|
     (?:[A-Fa-f0-9]{1,4}:){1,4}
       (?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}
       (?:25[0-5]|2[0-4]\d|1?\d?\d)
   )
-  (?:%[0-9A-Za-z.\-_:]+)? (?:/(?:12[0-8]|1[01]\d|\d{1,2}))?
-  (?![:\w])
+  (?:%[0-9A-Za-z.\-_:]+)?
+  (?:/(?:12[0-8]|1[01]\d|\d{1,2}))?
+  (?![0-9A-Fa-f])     # ← 우측: 추가 hexdigit 이어지면 제외 (추가 hextet 방지)
 )
 """, X | M | S),
 
-    # MAC_ADDRESS — (수정) 대문자 포함 검증 lookahead 제거
-    "MAC_ADDRESS": re.compile(r"(?xi)(?=[0-9A-F]{2}([-:]))[0-9A-F]{2}(?:\1[0-9A-F]{2}){5}"),
+# MAC_ADDRESS — (수정) 대문자 포함 검증 lookahead 제거
+"MAC_ADDRESS": re.compile(r"(?xi)(?=[0-9A-F]{2}([-:]))[0-9A-F]{2}(?:\1[0-9A-F]{2}){5}"),
 }

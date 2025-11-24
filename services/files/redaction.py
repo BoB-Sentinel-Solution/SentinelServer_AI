@@ -1,4 +1,3 @@
-# services/files/redaction.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -612,7 +611,9 @@ def redact_saved_file(saved: SavedFileInfo) -> RedactedFileInfo:
       * PRIVATE_KEY 같이 블록 패턴은 페이지 전체를 가리는 보수적 처리
     - 기타 확장자는 레댁션 없이 그대로 반환
     """
-    ext = (saved.ext or "").lower()
+    # 실제 파일 경로 기준으로 확장자 normalize
+    suffix = saved.path.suffix.lower().lstrip(".") if saved.path.suffix else ""
+    ext = suffix or (saved.ext or "").lower().lstrip(".")
 
     if ext in IMAGE_EXTS:
         return _redact_image_file(saved)

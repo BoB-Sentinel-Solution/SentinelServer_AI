@@ -1,4 +1,3 @@
-# services/files/__init__.py
 from __future__ import annotations
 
 from services.attachment import SavedFileInfo
@@ -32,7 +31,9 @@ def process_saved_file(saved: SavedFileInfo) -> FileProcessResult:
     """
 
     result = FileProcessResult.from_saved(saved)
-    ext = (saved.ext or "").lower()
+
+    # 항상 normalize 된 ext 사용 (점 없음, 소문자)
+    ext = (result.ext or "").lower()
 
     # 텍스트 기반 문서(DOCX / PPTX / XLSX / TXT / CSV)만 처리
     if ext in DOC_EXTS and ext != "pdf":

@@ -1,4 +1,3 @@
-# services/files/document.py
 from __future__ import annotations
 
 from typing import Tuple, List
@@ -227,7 +226,8 @@ def process_document_file(result: FileProcessResult) -> FileProcessResult:
 
     PDF는 redaction.py 에서 좌표 기반 레댁션으로 처리한다.
     """
-    ext = (result.ext or "").lower()
+    # 방어적으로 한 번 더 normalize (".docx" → "docx")
+    ext = (result.ext or "").lower().lstrip(".")
     path = result.saved_path
 
     if ext in {"docx", "pptx", "xlsx"}:
@@ -241,9 +241,5 @@ def process_document_file(result: FileProcessResult) -> FileProcessResult:
     result.extracted_text = text if used and text else ""
     result.ocr_error = err or None
 
-    # 나중에 반환할 때 detection 파일을 쓰고 싶다면,
-    # 같은 규칙으로 경로를 계산해서 사용하면 됨:
-    # detection_path = _make_detection_path(path)
-    # (여기서 필드로 붙이고 싶다면 result.detection_path = detection_path 식으로 추가 가능)
-
+    # detection 파일 경로는 필요 시 _make_detection_path(path) 로 계산 가능
     return result

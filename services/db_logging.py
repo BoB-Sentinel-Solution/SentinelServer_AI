@@ -4,6 +4,8 @@ from __future__ import annotations
 import uuid, time, os, base64
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
+import logging  # 추가
+
 from sqlalchemy.orm import Session
 
 from schemas import InItem, ServerOut, Entity
@@ -21,6 +23,8 @@ from services.ai_external import OfflineDetectorRunner
 
 # 3) 파일 처리(문서 detection / 이미지·PDF redaction)
 from services.files import process_saved_file, redact_saved_file, DOC_EXTS
+
+logger = logging.getLogger(__name__)  # 추가
 
 ADMIN_IMAGE_DIR = Path("./SentinelServer_AI/adminset/image")
 SIMILARITY_THRESHOLD = 0.4  # 이미지 유사도 차단 임계
@@ -251,7 +255,6 @@ class DbLoggingService:
         saved_mime: Optional[str] = saved_info.mime if saved_info else None
 
         # 2) OCR (이미지 유사도 차단 / 파일 내 텍스트 민감도 판정에 사용)
-        #    내부 구현에서 saved_path 를 다시 활용할 수 있음 (기존 OcrService 유지)
         ocr_text, ocr_used, _ = OcrService.run_ocr(item)
 
         # (선택) OCR 텍스트에도 정규식 적용 (파일 내 민감값 탐지용)
@@ -264,14 +267,12 @@ class DbLoggingService:
             regex_ents_ocr = []
 
         # === 파일 내 민감정보 플래그 ===
-        # OCR 결과에서 정규식으로 엔티티가 하나라도 잡히면
-        # "파일 안에서 민감정보가 탐지되었다"고 간주
         file_has_sensitive = bool(regex_ents_ocr)
 
         # 3) 정규식 1차 감지 (프롬프트 원문 기준 스팬 확보)
         prompt_text = item.prompt or ""
         try:
-            regex_ents_prompt: List[Dict[str, Any]] = regex_detect(prompt_text)  # [{label,value,begin,end}, ...]
+            regex_ents_prompt: List[Dict[str, Any]] = regex_detect(prompt_text)
         except Exception:
             regex_ents_prompt = []
 
@@ -282,7 +283,6 @@ class DbLoggingService:
         )
 
         # 5) AI 보완 탐지 — 힌트 라벨 없이, 마스킹된 프롬프트만 전달
-        #    기대 출력: {"has_sensitive": bool, "entities":[{"type","value"}], "processing_ms": <int?>}
         try:
             det_ai = _DETECTOR.analyze_text(masked_for_ai, return_spans=False)
         except Exception:
@@ -303,8 +303,6 @@ class DbLoggingService:
         )
 
         # 7) 정책결정 (파일 민감정보 + 이미지 유사도 포함)
-        #    - file_has_sensitive: 파일 안 텍스트에서 민감값이 발견됨
-        #    - file_blocked: 원본 파일 업로드는 차단하지만, redaction 결과는 attachment로 반환 가능
         file_blocked = bool(file_has_sensitive)
         allow = True  # 기본은 요청 자체는 허용 (마스킹/레댁션 전제)
 
@@ -344,7 +342,6 @@ class DbLoggingService:
             ai_src=ai_ents_rebased,
         )
         if not alert_text and prompt_entities:
-            # 안전망: 최종 라벨만이라도 노출
             labels = sorted({e["label"] for e in prompt_entities})
             if labels:
                 alert_text = f"Detected: {', '.join(labels)}"
@@ -355,14 +352,14 @@ class DbLoggingService:
         # hostname 우선, 없으면 pc_name 대체 (schemas가 별칭 처리)
         host_name = item.hostname or item.pc_name
 
-        # 10) DB 저장 (프롬프트 엔티티만 저장, 첨부는 원본 그대로 직렬화)
+        # 10) DB 저장
         rec = LogRecord(
             request_id      = request_id,
             time            = item.time,
             public_ip       = item.public_ip,
             private_ip      = item.private_ip,
             host            = item.host or "unknown",
-            hostname        = host_name,  # 컬럼명: hostname
+            hostname        = host_name,
             prompt          = prompt_text,
             attachment      = DbLoggingService._serialize_attachment(item.attachment),
             interface       = item.interface or "llm",
@@ -378,7 +375,7 @@ class DbLoggingService:
         )
         LogRepository.create(db, rec)
 
-        # 11) 응답 (에이전트로 '근거' + 처리된 첨부파일 전달)
+        # 11) 응답
         return ServerOut(
             request_id      = request_id,
             host            = rec.host,
@@ -393,5 +390,5 @@ class DbLoggingService:
             allow           = rec.allow,
             action          = rec.action,
             alert           = alert_text,
-            attachment      = response_attachment,  # redaction/detection 적용된 파일
+            attachment      = response_attachment,
         )

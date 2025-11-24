@@ -52,9 +52,12 @@ TOKEN_LABELS = [k for k in REGEX_PATTERNS.keys() if k not in PAGE_ONLY_LABELS]
 # === EAST 관련 추가 ===
 EAST_CONF_THRESH = 0.5
 EAST_NMS_THRESH = 0.4
+
+BASE_DIR = Path(__file__).resolve().parent  # == services/files
+
 EAST_MODEL_CANDIDATES = [
-    Path("models/frozen_east_text_detection.pb"),
-    Path("frozen_east_text_detection.pb"),
+    BASE_DIR / "models" / "frozen_east_text_detection.pb",  # services/files/models/...
+    Path("models/frozen_east_text_detection.pb"),           # (옵션) 프로젝트 루트/models 도 같이 체크
 ]
 
 _EAST_NET = None

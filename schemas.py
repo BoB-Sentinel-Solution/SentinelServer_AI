@@ -19,8 +19,12 @@ except Exception:  # v1 fallback
 
 # --------------------- 기본 객체 ---------------------
 class Attachment(BaseModel):
-    format: Optional[str] = None   # MIME type (e.g., "image/png", "application/pdf")
-    data:   Optional[str] = None   # base64 (운영에서는 저장 지양)
+    # format: 서버에서 지원하는 확장자 (예: "png", "jpg", "pdf", "docx" ...)
+    format: Optional[str] = None
+    # data: base64 인코딩된 파일 데이터 (요청/응답 공통)
+    data: Optional[str] = None
+    # 선택: 바이트 크기(응답에서 사용, 요청에서는 없어도 됨)
+    size: Optional[int] = None
 
 
 # --------------------- 입력 스키마 ---------------------
@@ -86,5 +90,8 @@ class ServerOut(BaseModel):
     allow: bool = True
     action: str = "allow"
 
-    # 추가: 에이전트로 보내는 "근거" 텍스트
+    # 에이전트로 보내는 "근거" 텍스트
     alert: str = ""  # 로컬 AI의 reason/설명 등을 넣어 전달
+
+    # 레댁션/디텍션 완료된 첨부파일 (없으면 None)
+    attachment: Optional[Attachment] = None

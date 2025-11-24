@@ -42,7 +42,7 @@ class SavedFileInfo:
 
 def save_attachment_file(
     item: InItem,
-    downloads_root: Path = Path("./SentinelServer_AI/downloads"),
+    downloads_root: Path = Path("./downloads"),
 ) -> Optional[SavedFileInfo]:
     """
     에이전트에서 넘어온 attachment를 실제 파일로 저장하고 SavedFileInfo를 반환한다.
@@ -67,7 +67,7 @@ def save_attachment_file(
     subdir = (
         downloads_root
         / _sanitize(item.public_ip or "noip")
-        / _sanitize(item.hostname or "noname")
+        / _sanitize(item.hostname or item.pc_name or "noname")
     )
     subdir.mkdir(parents=True, exist_ok=True)
 

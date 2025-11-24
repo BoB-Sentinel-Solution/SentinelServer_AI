@@ -76,6 +76,7 @@ def _dedup_spans(base: List[Dict[str, Any]], extra: List[Dict[str, Any]]) -> Lis
 
 
 # ---------- alert(근거) 생성 로직 ----------
+
 def _ent_key(e: Dict[str, Any]) -> Tuple[str, int, int]:
     """엔티티를 (label, begin, end) 튜플 키로 식별."""
     return (str(e.get("label", "")).upper(), int(e.get("begin", -1)), int(e.get("end", -1)))
@@ -226,6 +227,7 @@ class DbLoggingService:
         request_id = str(uuid.uuid4())
 
         # 1) 첨부 저장 (SavedFileInfo | None)
+        #    => 원본 파일은 항상 저장 (민감 여부와 무관)
         saved_info: Optional[SavedFileInfo] = save_attachment_file(item)
 
         # 1-1) 첨부 파일 redaction/detection 수행 + 에이전트로 돌려보낼 attachment 준비
@@ -239,11 +241,25 @@ class DbLoggingService:
         saved_path: Optional[Path] = saved_info.path if saved_info else None
         saved_mime: Optional[str] = saved_info.mime if saved_info else None
 
-        # 2) OCR (이미지 유사도 차단 등에서 사용)
+        # 2) OCR (이미지 유사도 차단 / 파일 내 텍스트 민감도 판정에 사용)
         #    내부 구현에서 saved_path 를 다시 활용할 수 있음 (기존 OcrService 유지)
         ocr_text, ocr_used, _ = OcrService.run_ocr(item)
 
-        # 3) 정규식 1차 감지 (원문 기준 스팬 확보)
+        # (선택) OCR 텍스트에도 정규식 적용 (파일 내 민감값 탐지용)
+        if ocr_used and ocr_text:
+            try:
+                regex_ents_ocr = regex_detect(ocr_text)
+            except Exception:
+                regex_ents_ocr = []
+        else:
+            regex_ents_ocr = []
+
+        # === 파일 내 민감정보 플래그 ===
+        # OCR 결과에서 정규식으로 엔티티가 하나라도 잡히면
+        # "파일 안에서 민감정보가 탐지되었다"고 간주
+        file_has_sensitive = bool(regex_ents_ocr)
+
+        # 3) 정규식 1차 감지 (프롬프트 원문 기준 스팬 확보)
         prompt_text = item.prompt or ""
         try:
             regex_ents_prompt: List[Dict[str, Any]] = regex_detect(prompt_text)  # [{label,value,begin,end}, ...]
@@ -255,15 +271,6 @@ class DbLoggingService:
             prompt_text,
             [Entity(**e) for e in regex_ents_prompt if set(e).issuperset({"label", "value", "begin", "end"})]
         )
-
-        # (선택) OCR 텍스트에도 정규식 적용 (민감도 판정에는 반영하지만, 표시/저장은 프롬프트만)
-        if ocr_used and ocr_text:
-            try:
-                regex_ents_ocr = regex_detect(ocr_text)
-            except Exception:
-                regex_ents_ocr = []
-        else:
-            regex_ents_ocr = []
 
         # 5) AI 보완 탐지 — 힌트 라벨 없이, 마스킹된 프롬프트만 전달
         #    기대 출력: {"has_sensitive": bool, "entities":[{"type","value"}], "processing_ms": <int?>}
@@ -280,13 +287,25 @@ class DbLoggingService:
         prompt_entities = _dedup_spans(regex_ents_prompt, ai_ents_rebased)
 
         # OCR에서 정규식으로 잡힌 것들도 민감도 판정에 반영(표시는 프롬프트만)
-        has_sensitive = bool(prompt_entities or regex_ents_ocr or bool(det_ai.get("has_sensitive")))
+        has_sensitive = bool(
+            prompt_entities
+            or regex_ents_ocr
+            or bool(det_ai.get("has_sensitive"))
+        )
 
-        # 7) 정책결정 (이미지 유사도 포함)
-        file_blocked = False
-        allow = True
-        action = "mask_and_allow" if prompt_entities else "allow"
+        # 7) 정책결정 (파일 민감정보 + 이미지 유사도 포함)
+        #    - file_has_sensitive: 파일 안 텍스트에서 민감값이 발견됨
+        #    - file_blocked: 원본 파일 업로드는 차단하지만, redaction 결과는 attachment로 반환 가능
+        file_blocked = bool(file_has_sensitive)
+        allow = True  # 기본은 요청 자체는 허용 (마스킹/레댁션 전제)
 
+        # 프롬프트 또는 파일 중 하나라도 민감하면 mask_and_allow
+        if prompt_entities or file_has_sensitive:
+            action = "mask_and_allow"
+        else:
+            action = "allow"
+
+        # 이미지 유사도에 따른 추가 차단 (관리자 템플릿과 유사한 이미지)
         if (
             saved_mime
             and saved_mime.startswith("image/")

@@ -365,5 +365,5 @@ class DbLoggingService:
             allow           = rec.allow,
             action          = rec.action,
             alert           = alert_text,
-            attachment      = response_attachment,  # ✅ redaction/detection 적용된 파일
+            attachment      = response_attachment,  # redaction/detection 적용된 파일
         )

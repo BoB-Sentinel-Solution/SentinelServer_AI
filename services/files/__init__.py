@@ -5,7 +5,7 @@ from services.attachment import SavedFileInfo
 from .types import FileProcessResult, IMAGE_EXTS, DOC_EXTS
 from . import image as image_handlers
 from . import document as document_handlers
-
+from .redaction import redact_saved_file, RedactedFileInfo
 
 def process_saved_file(saved: SavedFileInfo) -> FileProcessResult:
     """

@@ -181,14 +181,13 @@ class DbLoggingService:
             "format": fmt,
             "data": data_b64,
         }
-        # 사이즈 정보도 같이 넣어주고 싶으면:
+        # 필요하다면 사이즈도 추가로 전달
         attachment_out["size"] = size
         return attachment_out
 
     @staticmethod
-    def _process_attachment_file(item: InItem,
-                                 saved_path: Optional[Path],
-                                 saved_mime: Optional[str]) -> Tuple[Optional[Path], Dict[str, Any] | None]:
+    def _process_attachment_saved(saved: Optional[SavedFileInfo],
+                                  att_src) -> Tuple[Optional[Path], Dict[str, Any] | None]:
         """
         첨부파일에 대해 확장자별로 redaction/detection 수행 후,
         에이전트로 돌려보낼 attachment JSON을 생성한다.
@@ -196,38 +195,29 @@ class DbLoggingService:
         return:
           (processed_path, response_attachment_dict)
         """
-        if not saved_path or not saved_mime:
+        if not saved:
             return None, None
 
-        ext = saved_path.suffix.lower().lstrip(".")
-        if not ext:
-            return None, None
-
-        # SavedFileInfo 구성
-        saved_fileinfo = SavedFileInfo(
-            path=saved_path,
-            ext=ext,
-            mime=saved_mime,
-        )
-
+        ext = (saved.ext or "").lower()
         processed_path: Optional[Path] = None
 
         try:
             # 1) 텍스트 기반 문서(DOCX/PPTX/XLSX/TXT/CSV) → detection 파일 생성
+            #    (항상 *.detection.ext 로 저장)
             if ext in DOC_EXTS and ext != "pdf":
-                # 내부에서 *.detection.* 파일을 생성
-                process_saved_file(saved_fileinfo)
-                processed_path = saved_path.with_name(f"{saved_path.stem}.detection{saved_path.suffix}")
+                process_saved_file(saved)  # 내부에서 detection 파일 생성
+                processed_path = saved.path.with_name(
+                    f"{saved.path.stem}.detection{saved.path.suffix}"
+                )
             else:
                 # 2) 이미지/스캔/PDF 등 → redaction 파이프라인
-                red = redact_saved_file(saved_fileinfo)
+                red = redact_saved_file(saved)
+                # red.redacted_path 가 없으면 original_path 사용
                 processed_path = red.redacted_path or red.original_path
         except Exception:
             processed_path = None
 
-        resp_attachment = DbLoggingService._build_response_attachment(
-            item.attachment, processed_path
-        )
+        resp_attachment = DbLoggingService._build_response_attachment(att_src, processed_path)
         return processed_path, resp_attachment
 
     @staticmethod
@@ -235,19 +225,19 @@ class DbLoggingService:
         t0 = time.perf_counter()
         request_id = str(uuid.uuid4())
 
-        # 1) 첨부 저장
-        saved_info = save_attachment_file(item)  # -> (path, mime) or None
-        saved_path: Optional[Path] = None
-        saved_mime: Optional[str] = None
-        if saved_info:
-            saved_path, saved_mime = saved_info
+        # 1) 첨부 저장 (SavedFileInfo | None)
+        saved_info: Optional[SavedFileInfo] = save_attachment_file(item)
 
         # 1-1) 첨부 파일 redaction/detection 수행 + 에이전트로 돌려보낼 attachment 준비
         processed_path: Optional[Path]
         response_attachment: Dict[str, Any] | None
-        processed_path, response_attachment = DbLoggingService._process_attachment_file(
-            item, saved_path, saved_mime
+        processed_path, response_attachment = DbLoggingService._process_attachment_saved(
+            saved_info, item.attachment
         )
+
+        # similarity 체크용 path/mime 분리
+        saved_path: Optional[Path] = saved_info.path if saved_info else None
+        saved_mime: Optional[str] = saved_info.mime if saved_info else None
 
         # 2) OCR (이미지 유사도 차단 등에서 사용)
         #    내부 구현에서 saved_path 를 다시 활용할 수 있음 (기존 OcrService 유지)

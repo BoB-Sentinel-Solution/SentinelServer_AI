@@ -189,13 +189,6 @@ class DbLoggingService:
     @staticmethod
     def _process_attachment_saved(saved: Optional[SavedFileInfo],
                                   att_src) -> Tuple[Optional[Path], Dict[str, Any] | None]:
-        """
-        첨부파일에 대해 확장자별로 redaction/detection 수행 후,
-        에이전트로 돌려보낼 attachment JSON을 생성한다.
-
-        return:
-          (processed_path, response_attachment_dict)
-        """
         if not saved:
             return None, None
 
@@ -203,22 +196,38 @@ class DbLoggingService:
         processed_path: Optional[Path] = None
 
         try:
-            # 1) 텍스트 기반 문서(DOCX/PPTX/XLSX/TXT/CSV) → detection 파일 생성
-            #    (항상 *.detection.ext 로 저장)
             if ext in DOC_EXTS and ext != "pdf":
-                process_saved_file(saved)  # 내부에서 detection 파일 생성
+                logger.info(f"[ATTACH] process_saved_file: {saved.path} (ext={ext})")
+                process_saved_file(saved)
                 processed_path = saved.path.with_name(
                     f"{saved.path.stem}.detection{saved.path.suffix}"
                 )
             else:
-                # 2) 이미지/스캔/PDF 등 → redaction 파이프라인
+                logger.info(f"[ATTACH] redact_saved_file: {saved.path} (ext={ext})")
                 red = redact_saved_file(saved)
-                # red.redacted_path 가 없으면 original_path 사용
+                logger.info(
+                    f"[ATTACH] redacted result: original={red.original_path}, "
+                    f"redacted={red.redacted_path}, performed={red.redaction_performed}, "
+                    f"error={red.redaction_error}"
+                )
                 processed_path = red.redacted_path or red.original_path
-        except Exception:
+        except Exception as e:
+            logger.exception(f"[ATTACH] _process_attachment_saved error: {e}")
             processed_path = None
 
+        if processed_path is None:
+            logger.warning("[ATTACH] processed_path is None (saved=%s)", saved.path)
+        else:
+            logger.info("[ATTACH] processed_path exists=%s -> %s",
+                        processed_path.exists(), processed_path)
+
         resp_attachment = DbLoggingService._build_response_attachment(att_src, processed_path)
+        if resp_attachment is None:
+            logger.warning("[ATTACH] response_attachment is None (processed_path=%s)", processed_path)
+        else:
+            logger.info("[ATTACH] response_attachment built (size=%s)",
+                        resp_attachment.get("size"))
+
         return processed_path, resp_attachment
 
     @staticmethod

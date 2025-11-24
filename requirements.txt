@@ -59,3 +59,4 @@ python-docx
 python-pptx
 openpyxl
 python-magic
+opencv-python-headless

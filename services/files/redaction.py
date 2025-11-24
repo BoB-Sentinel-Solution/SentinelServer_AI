@@ -29,6 +29,14 @@ except ImportError:  # pragma: no cover
 
 from PIL import Image, ImageDraw
 
+# 테서렉트 경로 체크
+if pytesseract is not None:
+    from pathlib import Path as _Path
+    # Ubuntu 패키지 설치 기본 경로들 체크
+    for _cand in ["/usr/bin/tesseract", "/usr/local/bin/tesseract"]:
+        if _Path(_cand).exists():
+            pytesseract.pytesseract.tesseract_cmd = _cand
+            break
 
 # ------------------------------------
 # 설정값

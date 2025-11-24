@@ -9,7 +9,7 @@ Group=${RUN_GROUP}
 WorkingDirectory=${APP_DST}
 
 EnvironmentFile=${APP_DST}/setup/.env
-Environment=PATH=${APP_DST}/.venv/bin
+Environment=PATH=${APP_DST}/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=PYTHONUNBUFFERED=1
 
 # HF/Transformers 캐시

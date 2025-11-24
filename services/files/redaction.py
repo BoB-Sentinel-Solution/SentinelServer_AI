@@ -5,10 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List, Tuple
 
+import math
+
 from services.attachment import SavedFileInfo
 from services.regex_rules import PATTERNS as REGEX_PATTERNS
 
-# 외부 라이브러리: 없으면 레댁션을 건너뛰고 에러 메시지만 남긴다.
+# -------------------------------
+# 외부 라이브러리 (선택)
+# -------------------------------
 try:
     import fitz  # PyMuPDF
 except ImportError:  # pragma: no cover
@@ -19,7 +23,13 @@ try:
 except ImportError:  # pragma: no cover
     pytesseract = None  # type: ignore
 
+try:
+    import cv2  # type: ignore
+except ImportError:  # pragma: no cover
+    cv2 = None  # type: ignore
+
 from PIL import Image, ImageDraw
+
 
 # ------------------------------------
 # 설정값
@@ -38,6 +48,18 @@ PDF_EXTS = {"pdf"}
 # PRIVATE_KEY 같이 블록 전체를 보는 패턴은 페이지 전체를 가리는 방식으로 처리한다.
 PAGE_ONLY_LABELS = {"PRIVATE_KEY"}
 TOKEN_LABELS = [k for k in REGEX_PATTERNS.keys() if k not in PAGE_ONLY_LABELS]
+
+# === EAST 관련 추가 ===
+EAST_CONF_THRESH = 0.5
+EAST_NMS_THRESH = 0.4
+EAST_MODEL_CANDIDATES = [
+    Path("models/frozen_east_text_detection.pb"),
+    Path("frozen_east_text_detection.pb"),
+]
+
+_EAST_NET = None
+_EAST_TRIED = False
+# ======================
 
 
 @dataclass
@@ -64,6 +86,128 @@ def _ensure_ocr_available() -> Optional[str]:
     if pytesseract is None:
         return "pytesseract_not_available"
     return None
+
+
+# === EAST 관련 함수들 ===
+
+def _load_east_model():
+    """frozen_east_text_detection.pb가 있으면 한 번만 로딩해서 캐싱."""
+    global _EAST_NET, _EAST_TRIED
+    if _EAST_TRIED:
+        return _EAST_NET
+    _EAST_TRIED = True
+
+    if cv2 is None:
+        _EAST_NET = None
+        return None
+
+    for p in EAST_MODEL_CANDIDATES:
+        if p.exists():
+            try:
+                net = cv2.dnn.readNet(str(p))
+                _EAST_NET = net
+                return net
+            except Exception:
+                _EAST_NET = None
+                return None
+
+    _EAST_NET = None
+    return None
+
+
+def _east_has_text(net, pil_img: Image.Image, conf_thresh: float = EAST_CONF_THRESH) -> bool:
+    """
+    EAST로 '텍스트가 있을 법한지'만 빠르게 확인.
+    - net이 None이면 True 반환 (OCR 수행 경로로)
+    """
+    if net is None or cv2 is None:
+        return True
+
+    img = cv2.cvtColor(
+        # PIL → numpy → BGR
+        __import__("numpy").array(pil_img),  # numpy가 없으면 ImportError 나지만, 일반적으로 설치되어 있음
+        cv2.COLOR_RGB2BGR,
+    )
+
+    inpW = 320
+    inpH = 320
+    blob = cv2.dnn.blobFromImage(
+        img,
+        1.0,
+        (inpW, inpH),
+        (123.68, 116.78, 103.94),
+        swapRB=True,
+        crop=False,
+    )
+    net.setInput(blob)
+    try:
+        scores, geometry = net.forward(
+            ["feature_fusion/Conv_7/Sigmoid", "feature_fusion/concat_3"]
+        )
+    except Exception:
+        # EAST 실행 실패 시에는 OCR 경로를 타도록 True
+        return True
+
+    rects_xyxy: List[Tuple[int, int, int, int]] = []
+    confidences: List[float] = []
+
+    numRows, numCols = scores.shape[2:4]
+    for y in range(numRows):
+        scoresData = scores[0, 0, y]
+        xData0 = geometry[0, 0, y]
+        xData1 = geometry[0, 1, y]
+        xData2 = geometry[0, 2, y]
+        xData3 = geometry[0, 3, y]
+        anglesData = geometry[0, 4, y]
+
+        for x in range(numCols):
+            score = float(scoresData[x])
+            if score < conf_thresh:
+                continue
+
+            offsetX = x * 4.0
+            offsetY = y * 4.0
+            angle = float(anglesData[x])
+            cos = math.cos(angle)
+            sin = math.sin(angle)
+
+            h = float(xData0[x] + xData2[x])
+            w = float(xData1[x] + xData3[x])
+
+            endX = int(offsetX + (cos * xData1[x]) + (sin * xData2[x]))
+            endY = int(offsetY - (sin * xData1[x]) + (cos * xData2[x]))
+            startX = int(endX - w)
+            startY = int(endY - h)
+
+            rects_xyxy.append((startX, startY, endX, endY))
+            confidences.append(score)
+
+    if not rects_xyxy:
+        return False
+
+    # xyxy → xywh
+    boxes_xywh = []
+    for (sx, sy, ex, ey) in rects_xyxy:
+        x = int(sx)
+        y = int(sy)
+        w = int(max(1, ex - sx))
+        h = int(max(1, ey - sy))
+        boxes_xywh.append([x, y, w, h])
+
+    try:
+        idxs = cv2.dnn.NMSBoxes(boxes_xywh, confidences, conf_thresh, EAST_NMS_THRESH)
+    except Exception:
+        # NMS 실패 시에는 '텍스트 있을 수 있다'로 간주
+        return True
+
+    if idxs is None:
+        return False
+    try:
+        return len(idxs) > 0
+    except Exception:
+        return True
+
+# =========================
 
 
 # ------------------------------------
@@ -161,6 +305,7 @@ def _redact_image_file(saved: SavedFileInfo) -> RedactedFileInfo:
     """
     이미지 파일에 대해:
     - 해상도 체크
+    - (선택) EAST로 텍스트 존재 여부 확인
     - Tesseract OCR
     - regex_rules.PATTERNS 기반 매칭 → 박스 계산
     - 박스 병합/패딩
@@ -189,6 +334,19 @@ def _redact_image_file(saved: SavedFileInfo) -> RedactedFileInfo:
             redaction_performed=False,
             redaction_error="small_resolution",
         )
+
+    # === EAST: 텍스트 존재 여부 빠른 체크 ===
+    east_net = _load_east_model()
+    if east_net is not None and not _east_has_text(east_net, pil):
+        return RedactedFileInfo(
+            ext=saved.ext,
+            mime=saved.mime,
+            original_path=saved.path,
+            redacted_path=saved.path,
+            redaction_performed=False,
+            redaction_error="no_text_detected_by_east",
+        )
+    # =====================================
 
     # 전처리 없이 OCR (서버 안정성을 위해 최소화)
     text, data = _tesseract_ocr(pil)
@@ -339,6 +497,8 @@ def _redact_pdf_file(saved: SavedFileInfo) -> RedactedFileInfo:
 
     # OCR 사용 가능 여부 체크 (스캔 페이지 대응)
     ocr_err = _ensure_ocr_available()
+    # EAST는 한 번만 로딩해서 재사용
+    east_net = _load_east_model()
 
     any_redacted = False
     redacted_path = saved.path
@@ -383,6 +543,11 @@ def _redact_pdf_file(saved: SavedFileInfo) -> RedactedFileInfo:
 
                 if _mpixels_of_img(pil_raw) < MIN_MP:
                     continue
+
+                # === EAST: 텍스트 존재 여부 확인 ===
+                if east_net is not None and not _east_has_text(east_net, pil_raw):
+                    continue
+                # =================================
 
                 text, data_tmp = _tesseract_ocr(pil_raw)
                 boxes = _ocr_sensitive_boxes(data_tmp)
@@ -438,13 +603,11 @@ def redact_saved_file(saved: SavedFileInfo) -> RedactedFileInfo:
     """
     SavedFileInfo(다운로드된 파일)에 대해:
     - 이미지면: regex_rules.PATTERNS 기반으로 민감정보 영역 레스터 마스킹
+      * OCR 전에 EAST로 텍스트 존재 여부를 확인해 쓸데없는 OCR을 줄임
     - PDF면: 텍스트 레이어 + 스캔 페이지 모두 regex_rules.PATTERNS 기반으로 레댁션/마스킹
+      * 스캔 페이지에서도 OCR 전에 EAST로 텍스트 존재 여부를 확인
       * PRIVATE_KEY 같이 블록 패턴은 페이지 전체를 가리는 보수적 처리
     - 기타 확장자는 레댁션 없이 그대로 반환
-
-    최종적으로:
-      - redacted_path: 레댁션된 파일 경로 (없으면 original_path)
-      - redaction_performed: 실제로 뭔가 가려진 경우 True
     """
     ext = (saved.ext or "").lower()
 

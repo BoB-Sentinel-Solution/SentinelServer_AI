@@ -53,3 +53,9 @@ uvloop==0.21.0
 watchfiles==1.1.0
 websockets==15.0.1
 accelerate>=0.26.0
+PyMuPDF
+opencv-python
+python-docx
+python-pptx
+openpyxl
+python-magic

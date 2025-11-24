@@ -1,7 +1,7 @@
 # services/db_logging.py
 from __future__ import annotations
 
-import uuid, time, os
+import uuid, time, os, base64
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from schemas import InItem, ServerOut, Entity
 from models import LogRecord
 from services.ocr import OcrService
 from services.masking import mask_by_entities, mask_with_parens_by_entities
-from services.attachment import save_attachment_file
+from services.attachment import save_attachment_file, SavedFileInfo
 from services.similarity import best_similarity_against_folder
 from repositories.log_repo import LogRepository
 
@@ -18,6 +18,9 @@ from repositories.log_repo import LogRepository
 from services.regex_detector import detect_entities as regex_detect
 # 2) 외부 판별기 러너(offline_sensitive_detector_min.py 호출)
 from services.ai_external import OfflineDetectorRunner
+
+# 3) 파일 처리(문서 detection / 이미지·PDF redaction)
+from services.files import process_saved_file, redact_saved_file, DOC_EXTS
 
 ADMIN_IMAGE_DIR = Path("./SentinelServer_AI/adminset/image")
 SIMILARITY_THRESHOLD = 0.4  # 이미지 유사도 차단 임계
@@ -27,6 +30,7 @@ _DETECTOR = OfflineDetectorRunner(
     model_dir=os.environ.get("MODEL_DIR", "").strip() or None,
     timeout_sec=20.0,
 )
+
 
 def _rebase_ai_entities_on_original(original: str, ai_ents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -51,6 +55,7 @@ def _rebase_ai_entities_on_original(original: str, ai_ents: List[Dict[str, Any]]
         out.append({"label": label, "value": value, "begin": b, "end": en})
     return out
 
+
 def _dedup_spans(base: List[Dict[str, Any]], extra: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     스팬 중복 제거: base 우선, extra는 같은 라벨에서 겹치면 버림.
@@ -69,10 +74,12 @@ def _dedup_spans(base: List[Dict[str, Any]], extra: List[Dict[str, Any]]) -> Lis
             out.append(e)
     return out
 
+
 # ---------- alert(근거) 생성 로직 ----------
 def _ent_key(e: Dict[str, Any]) -> Tuple[str, int, int]:
     """엔티티를 (label, begin, end) 튜플 키로 식별."""
     return (str(e.get("label", "")).upper(), int(e.get("begin", -1)), int(e.get("end", -1)))
+
 
 def _build_alert_from_merged(merged_ents: List[Dict[str, Any]],
                              regex_src: List[Dict[str, Any]],
@@ -113,16 +120,115 @@ def _build_alert_from_merged(merged_ents: List[Dict[str, Any]],
 
     return " ".join(parts)
 
+
 class DbLoggingService:
     @staticmethod
     def _serialize_attachment(att) -> Dict[str, Any] | None:
+        """
+        DB에 원본 attachment를 그대로 저장할 때 사용.
+        """
         if att is None:
             return None
         if hasattr(att, "model_dump"):
             return att.model_dump()
         if hasattr(att, "dict"):
             return att.dict()
+        if isinstance(att, dict):
+            return dict(att)
         return None
+
+    @staticmethod
+    def _get_attachment_format(att) -> Optional[str]:
+        """
+        InItem.attachment 에서 format 확장자 추출.
+        (dict / Pydantic 모델 모두 대응)
+        """
+        if att is None:
+            return None
+        fmt = None
+        if hasattr(att, "format"):
+            fmt = getattr(att, "format", None)
+        elif isinstance(att, dict):
+            fmt = att.get("format")
+        if not fmt:
+            return None
+        return str(fmt).lower()
+
+    @staticmethod
+    def _build_response_attachment(att_src, processed_path: Optional[Path]) -> Dict[str, Any] | None:
+        """
+        에이전트로 돌려보낼 attachment JSON 생성.
+        - format: 들어온 attachment.format 을 그대로 사용 (없으면 파일 확장자)
+        - data: 처리된 파일을 base64로 인코딩
+        - size: (선택) 처리된 파일 바이트 크기
+        """
+        if processed_path is None or not processed_path.exists():
+            return None
+
+        fmt = DbLoggingService._get_attachment_format(att_src)
+        if not fmt:
+            fmt = processed_path.suffix.lstrip(".").lower() or "bin"
+
+        try:
+            raw = processed_path.read_bytes()
+        except Exception:
+            return None
+
+        data_b64 = base64.b64encode(raw).decode("ascii")
+        size = len(raw)
+
+        attachment_out: Dict[str, Any] = {
+            "format": fmt,
+            "data": data_b64,
+        }
+        # 사이즈 정보도 같이 넣어주고 싶으면:
+        attachment_out["size"] = size
+        return attachment_out
+
+    @staticmethod
+    def _process_attachment_file(item: InItem,
+                                 saved_path: Optional[Path],
+                                 saved_mime: Optional[str]) -> Tuple[Optional[Path], Dict[str, Any] | None]:
+        """
+        첨부파일에 대해 확장자별로 redaction/detection 수행 후,
+        에이전트로 돌려보낼 attachment JSON을 생성한다.
+
+        return:
+          (processed_path, response_attachment_dict)
+        """
+        if not saved_path or not saved_mime:
+            return None, None
+
+        ext = saved_path.suffix.lower().lstrip(".")
+        if not ext:
+            return None, None
+
+        # SavedFileInfo 구성
+        saved_fileinfo = SavedFileInfo(
+            path=saved_path,
+            ext=ext,
+            mime=saved_mime,
+        )
+
+        processed_path: Optional[Path] = None
+
+        try:
+            # 1) 텍스트 기반 문서(DOCX/PPTX/XLSX/TXT/CSV) → detection 파일 생성
+            if ext in DOC_EXTS and ext != "pdf":
+                # 내부에서 *.detection.* 파일을 생성
+                process_saved_file(saved_fileinfo)
+                processed_path = saved_path.with_name(f"{saved_path.stem}.detection{saved_path.suffix}")
+            else:
+                # 2) 이미지/스캔/PDF 등 → redaction 파이프라인
+                red = redact_saved_file(saved_fileinfo)
+                processed_path = red.redacted_path or red.original_path
+        except Exception:
+            processed_path = None
+
+        resp_attachment = DbLoggingService._build_response_attachment(
+            item.attachment, processed_path
+        )
+        return processed_path, resp_attachment
 
     @staticmethod
     def handle(db: Session, item: InItem) -> ServerOut:
@@ -136,7 +242,15 @@ class DbLoggingService:
         if saved_info:
             saved_path, saved_mime = saved_info
 
-        # 2) OCR
+        # 1-1) 첨부 파일 redaction/detection 수행 + 에이전트로 돌려보낼 attachment 준비
+        processed_path: Optional[Path]
+        response_attachment: Dict[str, Any] | None
+        processed_path, response_attachment = DbLoggingService._process_attachment_file(
+            item, saved_path, saved_mime
+        )
+
+        # 2) OCR (이미지 유사도 차단 등에서 사용)
+        #    내부 구현에서 saved_path 를 다시 활용할 수 있음 (기존 OcrService 유지)
         ocr_text, ocr_used, _ = OcrService.run_ocr(item)
 
         # 3) 정규식 1차 감지 (원문 기준 스팬 확보)
@@ -149,7 +263,7 @@ class DbLoggingService:
         # 4) AI 입력용 마스킹(정규식 결과로만 라벨링, 괄호 포함)
         masked_for_ai = mask_with_parens_by_entities(
             prompt_text,
-            [Entity(**e) for e in regex_ents_prompt if set(e).issuperset({"label","value","begin","end"})]
+            [Entity(**e) for e in regex_ents_prompt if set(e).issuperset({"label", "value", "begin", "end"})]
         )
 
         # (선택) OCR 텍스트에도 정규식 적용 (민감도 판정에는 반영하지만, 표시/저장은 프롬프트만)
@@ -202,7 +316,7 @@ class DbLoggingService:
         # 8) 최종 마스킹(정규식 + AI 보완 엔티티 모두 반영, 괄호 없음)
         final_modified_prompt = mask_by_entities(
             prompt_text,
-            [Entity(**e) for e in prompt_entities if set(e).issuperset({"label","value","begin","end"})]
+            [Entity(**e) for e in prompt_entities if set(e).issuperset({"label", "value", "begin", "end"})]
         )
 
         # 9) alert(근거) 생성 — 최종 병합 결과 기준으로 출처 집계
@@ -223,7 +337,7 @@ class DbLoggingService:
         # hostname 우선, 없으면 pc_name 대체 (schemas가 별칭 처리)
         host_name = item.hostname or item.pc_name
 
-        # 10) DB 저장 (프롬프트 엔티티만 저장)
+        # 10) DB 저장 (프롬프트 엔티티만 저장, 첨부는 원본 그대로 직렬화)
         rec = LogRecord(
             request_id      = request_id,
             time            = item.time,
@@ -246,7 +360,7 @@ class DbLoggingService:
         )
         LogRepository.create(db, rec)
 
-        # 11) 응답 (에이전트로 '근거' 전달)
+        # 11) 응답 (에이전트로 '근거' + 처리된 첨부파일 전달)
         return ServerOut(
             request_id      = request_id,
             host            = rec.host,
@@ -254,11 +368,12 @@ class DbLoggingService:
             has_sensitive   = rec.has_sensitive,
             entities        = [
                 Entity(**e) for e in rec.entities
-                if isinstance(e, dict) and set(e).issuperset({"value","begin","end","label"})
+                if isinstance(e, dict) and set(e).issuperset({"value", "begin", "end", "label"})
             ],
             processing_ms   = rec.processing_ms,
             file_blocked    = rec.file_blocked,
             allow           = rec.allow,
             action          = rec.action,
             alert           = alert_text,
+            attachment      = response_attachment,  # ✅ redaction/detection 적용된 파일
         )

@@ -170,17 +170,18 @@
       .tip:focus::after {
         content: attr(data-tip);
         position: absolute;
-        right: 12px;          /* 카드 밖으로 안 나가게 pill의 오른쪽 기준 정렬 */
+        right: 12px;      /* pill 오른쪽보다 살짝 안쪽 */
         left: auto;
         bottom: 120%;
-        transform: none;   /* 가운데 정렬 제거 */
-        max-width: 260px;
-        padding: 6px 9px;
+        transform: none;
+        max-width: 320px; /* 가로 더 넓게 */
+        min-width: 200px; /* 너무 좁게 줄어드는 것 방지 */
+        padding: 4px 10px; /* 세로 패딩 줄여서 높이 줄이기 */
         border-radius: 10px;
         background: rgba(15, 23, 42, 0.98);
         color: #f5f7ff;
         font-size: 10px;
-        line-height: 1.4;
+        line-height: 1.3;
         text-align: left;
         border: 1px solid rgba(199, 230, 255, 0.95);
         box-shadow: 0 14px 26px rgba(15, 23, 42, 0.75);
@@ -540,27 +541,7 @@
 
     <script src="./js/api.js"></script>
     <script src="./js/login.js"></script>
-
-    <!-- 팝오버 닫기 스크립트 -->
-    <script>
-      (function () {
-        const details = document.querySelector(".login-popover");
-        if (!details) return;
-
-        const panel = details.querySelector(".popover-panel");
-        const closeBtn = details.querySelector(".pop-close");
-        if (!panel || !closeBtn) return;
-
-        const close = () => details.removeAttribute("open");
-
-        closeBtn.addEventListener("click", close);
-        panel.addEventListener("click", (e) => {
-          if (e.target === panel) close(); // 바깥 영역 클릭 시 닫기
-        });
-        document.addEventListener("keydown", (e) => {
-          if (e.key === "Escape" && details.hasAttribute("open")) close();
-        });
-      })();
-    </script>
+    <!-- 팝오버 전용 JS (inline 금지 때문에 별도 파일) -->
+    <script src="./js/info-popover.js"></script>
   </body>
 </html>

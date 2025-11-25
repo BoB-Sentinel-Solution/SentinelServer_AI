@@ -13,7 +13,8 @@ Environment=PATH=${APP_DST}/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/
 Environment=PYTHONUNBUFFERED=1
 
 # HF/Transformers 캐시
-Environment=TRANSFORMERS_CACHE=/var/cache/sentinel/hf
+# TRANSFORMERS_CACHE 는 v5에서 제거 예정 → HF_HOME 으로 교체
+Environment=HF_HOME=/var/cache/sentinel/hf
 Environment=HF_HUB_OFFLINE=1
 Environment=TRANSFORMERS_OFFLINE=1
 Environment=TOKENIZERS_PARALLELISM=false

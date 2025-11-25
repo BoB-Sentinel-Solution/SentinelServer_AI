@@ -28,8 +28,17 @@ _EXT_TO_MIME = {
 
 
 def _sanitize(s: str) -> str:
-    """파일/디렉터리 이름에 쓸 문자열을 최소한으로 정규화."""
-    return re.sub(r"[^A-Za-z0-9_.:-]", "_", s or "unknown")
+    """파일/디렉터리 이름에 쓸 문자열을 최소한으로 정규화.
+    
+    - 콜론(:)은 윈도우 호환성을 위해 하이픈(-)으로 치환
+    - 나머지 허용 문자 외에는 언더스코어(_)로 치환
+    """
+    s = s or "unknown"
+    # 1) 콜론을 먼저 하이픈으로 변환
+    s = s.replace(":", "-")
+    # 2) 파일명에 쓸 수 있는 안전한 문자만 남기고 나머지는 '_'로 치환
+    #    (콜론은 더 이상 허용하지 않음)
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", s)
 
 
 @dataclass
@@ -72,6 +81,7 @@ def save_attachment_file(
     subdir.mkdir(parents=True, exist_ok=True)
 
     # 3) 파일명: time 기반 + 확장자
+    #    → time 문자열에 포함된 ':'는 _sanitize 안에서 '-'로 변환됨
     stem = _sanitize(item.time)
     if not stem:
         stem = "unknown_time"

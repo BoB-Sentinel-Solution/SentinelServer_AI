@@ -1,4 +1,4 @@
-// ./js/info-popover.js
+// js/info-popover.js
 
 (function () {
   const details = document.querySelector(".login-popover");
@@ -10,10 +10,10 @@
 
   const close = () => details.removeAttribute("open");
 
-  // X 버튼 클릭
+  // X 버튼 클릭으로 닫기
   closeBtn.addEventListener("click", close);
 
-  // 오버레이 바깥 영역 클릭 시 닫기
+  // 오버레이 바깥 클릭으로 닫기
   panel.addEventListener("click", (e) => {
     if (e.target === panel) close();
   });

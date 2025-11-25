@@ -10,10 +10,13 @@ import re
 from schemas import InItem
 
 _EXT_TO_MIME = {
+    # 이미지
     "png":  "image/png",
     "jpg":  "image/jpeg",
     "jpeg": "image/jpeg",
     "webp": "image/webp",
+
+    #문서
     "pdf":  "application/pdf",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",

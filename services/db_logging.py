@@ -160,12 +160,13 @@ class DbLoggingService:
         return str(fmt).lower()
 
     @staticmethod
-    def _build_response_attachment(att_src, processed_path: Optional[Path]) -> Dict[str, Any] | None:
+    def _build_response_attachment(att_src, processed_path: Optional[Path], file_changed: bool = False) -> Dict[str, Any] | None:
         """
         에이전트로 돌려보낼 attachment JSON 생성.
         - format: 들어온 attachment.format 을 그대로 사용 (없으면 파일 확장자)
         - data: 처리된 파일을 base64로 인코딩
         - size: (선택) 처리된 파일 바이트 크기
+        - file_change: 원본 파일 대비 내용 변화 여부 (bool)
         """
         if processed_path is None or not processed_path.exists():
             return None
@@ -185,9 +186,9 @@ class DbLoggingService:
         attachment_out: Dict[str, Any] = {
             "format": fmt,
             "data": data_b64,
+            "size": size,
+            "file_change": bool(file_changed),
         }
-        # 필요하다면 사이즈도 추가로 전달
-        attachment_out["size"] = size
         return attachment_out
 
     @staticmethod
@@ -198,14 +199,23 @@ class DbLoggingService:
 
         ext = (saved.ext or "").lower()
         processed_path: Optional[Path] = None
+        file_changed: bool = False
 
         try:
+            # 1) 텍스트 기반 문서(DOCX/PPTX/XLSX/TXT/CSV) → detection 파일 생성
             if ext in DOC_EXTS and ext != "pdf":
                 logger.info(f"[ATTACH] process_saved_file: {saved.path} (ext={ext})")
                 process_saved_file(saved)
-                processed_path = saved.path.with_name(
+
+                detection_path = saved.path.with_name(
                     f"{saved.path.stem}.detection{saved.path.suffix}"
                 )
+                processed_path = detection_path
+                # detection 파일이 실제로 생성되고, 원본과 경로가 다르면 '변화'로 간주
+                if detection_path.exists() and detection_path != saved.path:
+                    file_changed = True
+
+            # 2) 이미지/스캔/PDF 등 → redaction 파이프라인
             else:
                 logger.info(f"[ATTACH] redact_saved_file: {saved.path} (ext={ext})")
                 red = redact_saved_file(saved)
@@ -215,22 +225,41 @@ class DbLoggingService:
                     f"error={red.redaction_error}"
                 )
                 processed_path = red.redacted_path or red.original_path
+
+                # 레댁션이 실제 수행된 경우에만 '파일 내용 변화'
+                if red.redaction_performed and red.redacted_path and red.redacted_path != red.original_path:
+                    file_changed = True
+
         except Exception as e:
             logger.exception(f"[ATTACH] _process_attachment_saved error: {e}")
             processed_path = None
+            file_changed = False
 
         if processed_path is None:
             logger.warning("[ATTACH] processed_path is None (saved=%s)", saved.path)
         else:
-            logger.info("[ATTACH] processed_path exists=%s -> %s",
-                        processed_path.exists(), processed_path)
+            logger.info(
+                "[ATTACH] processed_path exists=%s -> %s",
+                processed_path.exists(),
+                processed_path,
+            )
 
-        resp_attachment = DbLoggingService._build_response_attachment(att_src, processed_path)
+        resp_attachment = DbLoggingService._build_response_attachment(
+            att_src,
+            processed_path,
+            file_changed=file_changed,
+        )
         if resp_attachment is None:
-            logger.warning("[ATTACH] response_attachment is None (processed_path=%s)", processed_path)
+            logger.warning(
+                "[ATTACH] response_attachment is None (processed_path=%s)",
+                processed_path,
+            )
         else:
-            logger.info("[ATTACH] response_attachment built (size=%s)",
-                        resp_attachment.get("size"))
+            logger.info(
+                "[ATTACH] response_attachment built (size=%s, file_change=%s)",
+                resp_attachment.get("size"),
+                resp_attachment.get("file_change"),
+            )
 
         return processed_path, resp_attachment
 

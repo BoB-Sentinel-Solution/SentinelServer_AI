@@ -4,6 +4,10 @@ from __future__ import annotations
 import os, json, shlex, re
 from typing import Any, Dict, List, Optional, Tuple
 import subprocess  # nosec B404  # shell=False + 인자리스트만 사용(검증된 입력)
+import time
+
+# Sentinel 내부 모듈 (로컬 LLM 추론용)
+from services import offline_sensitive_detector_min as det_min
 
 # ---- JSON 추출 유틸 (stdout에 경고/로그가 섞여도 OK) ----
 _CODE_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
@@ -109,7 +113,61 @@ def _add_spans(text: str, entities: List[Dict[str, Any]]) -> List[Dict[str, Any]
         out.append(e2)
     return out
 
-# ---- 서브프로세스 실행기 ----
+
+# ---- 전역 모델 캐시 ----
+_GLOBAL: Dict[str, Any] = {
+    "model_dir": None,
+    "tok": None,
+    "model": None,
+}
+
+def _ensure_model_loaded(model_dir: str) -> Tuple[Any, Any]:
+    """
+    offline_sensitive_detector_min.py 내부와 동일하게
+    AutoTokenizer / AutoModelForCausalLM 을 로딩하되,
+    프로세스 내에서 한 번만 로드해서 재사용.
+    """
+    global _GLOBAL
+
+    if (
+        _GLOBAL.get("model_dir") == model_dir
+        and _GLOBAL.get("tok") is not None
+        and _GLOBAL.get("model") is not None
+    ):
+        return _GLOBAL["tok"], _GLOBAL["model"]
+
+    # offline_sensitive_detector_min 에서 이미 import 한 것들을 재사용
+    AutoTokenizer = det_min.AutoTokenizer
+    AutoModelForCausalLM = det_min.AutoModelForCausalLM
+    torch = det_min.torch
+
+    tok = AutoTokenizer.from_pretrained(
+        model_dir,
+        trust_remote_code=True,
+        local_files_only=True,
+    )
+    model = AutoModelForCausalLM.from_pretrained(
+        model_dir,
+        device_map="auto",
+        torch_dtype="auto",
+        local_files_only=True,
+        trust_remote_code=True,
+    )
+    model.eval()
+    torch.set_grad_enabled(False)
+
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
+
+    _GLOBAL = {
+        "model_dir": model_dir,
+        "tok": tok,
+        "model": model,
+    }
+    return tok, model
+
+
+# ---- 서브프로세스 실행기 → 로컬 모델 실행기로 변경 ----
 class OfflineDetectorRunner:
     def __init__(
         self,
@@ -129,42 +187,31 @@ class OfflineDetectorRunner:
 
     def analyze_text(self, text: str, return_spans: bool = True) -> Dict[str, Any]:
         """
-        offline_sensitive_detector_min.py 를 --text 로 호출하여
+        offline_sensitive_detector_min.run_infer 를 직접 호출하여
         {"has_sensitive": bool, "entities":[{"type","value"(, begin,end)}]} 형태로 반환.
         실패 시 안전 폴백.
         """
-        # NOTE: Bandit B602 대응 — shell=False + 인자리스트 사용
-        args = [
-            self.python_bin,
-            self.script_path,
-            "--model_dir", self.model_dir,
-            "--text", text,
-            "--max_new_tokens", str(int(self.max_new_tokens)),
-        ]
+        t0 = time.perf_counter()
 
         try:
-            proc = subprocess.run(  # nosec B603 (인자리스트+shell=False)
-                args,
-                shell=False,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_sec,
-                check=False,
-            )
-        except subprocess.TimeoutExpired:
-            return {"has_sensitive": False, "entities": [], "error": "timeout"}
-
-        out = (proc.stdout or "") + ("\n" + (proc.stderr or "") if proc.stderr else "")
-        j = _find_last_json(out)
-        if not j:
-            return {"has_sensitive": False, "entities": [], "error": "no_json"}
-
-        try:
-            parsed = json.loads(j)
+            tok, model = _ensure_model_loaded(self.model_dir)
         except Exception:
-            return {"has_sensitive": False, "entities": [], "error": "json_parse_fail"}
+            return {"has_sensitive": False, "entities": [], "error": "model_load_fail"}
 
-        # 최소 스키마 정리
+        try:
+            # offline_sensitive_detector_min 안의 로직을 그대로 재사용
+            parsed = det_min.run_infer(
+                tok,
+                model,
+                text,
+                max_new_tokens=int(self.max_new_tokens),
+            )
+        except Exception:
+            return {"has_sensitive": False, "entities": [], "error": "infer_fail"}
+
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+
+        # 최소 스키마 정리 (기존 로직 유지)
         has = bool(parsed.get("has_sensitive"))
         ents = parsed.get("entities") or []
 
@@ -182,4 +229,8 @@ class OfflineDetectorRunner:
         if return_spans and clean:
             clean = _add_spans(text, clean)
 
-        return {"has_sensitive": bool(clean) if has or clean else False, "entities": clean}
+        return {
+            "has_sensitive": bool(clean) if has or clean else False,
+            "entities": clean,
+            "processing_ms": elapsed_ms,
+        }

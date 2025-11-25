@@ -44,7 +44,7 @@ sympy==1.14.0
 tifffile==2025.10.4
 tokenizers==0.20.1
 tqdm==4.67.1
-transformers==4.45.2
+transformers==4.57.1
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.5.0

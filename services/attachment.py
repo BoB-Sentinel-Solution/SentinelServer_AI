@@ -16,7 +16,7 @@ _EXT_TO_MIME = {
     "jpeg": "image/jpeg",
     "webp": "image/webp",
 
-    #문서
+    # 문서
     "pdf":  "application/pdf",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",

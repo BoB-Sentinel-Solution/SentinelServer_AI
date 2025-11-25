@@ -23,7 +23,9 @@ class Attachment(BaseModel):
     format: Optional[str] = None
     # data: base64 인코딩된 파일 데이터 (요청/응답 공통)
     data: Optional[str] = None
-    # 선택: 바이트 크기(응답에서 사용, 요청에서는 없어도 됨)
+    # size: base64 디코딩 기준 원본 바이너리 크기 (bytes)
+    #       - 요청: 에이전트가 반드시 채워서 보냄
+    #       - 응답: 서버가 동일 크기를 유지하도록 패딩
     size: Optional[int] = None
     # 파일 내용이 원본 대비 변경되었는지(레댁션/토큰 치환 등)
     file_change: bool = False

@@ -32,7 +32,7 @@ from PIL import Image, ImageDraw
 # 테서렉트 경로 체크
 if pytesseract is not None:
     from pathlib import Path as _Path
-    # Ubuntu 패키지 설치 기본 경로들 체크 
+    # Ubuntu 패키지 설치 기본 경로들 체크
     for _cand in ["/usr/bin/tesseract", "/usr/local/bin/tesseract"]:
         if _Path(_cand).exists():
             pytesseract.pytesseract.tesseract_cmd = _cand
@@ -96,6 +96,33 @@ def _ensure_ocr_available() -> Optional[str]:
     if pytesseract is None:
         return "pytesseract_not_available"
     return None
+
+
+def _pad_file_to_match(src: Path, dst: Path) -> None:
+    """
+    dst 파일의 크기가 src 파일보다 작으면,
+    src 파일 크기에 맞추어 0x00 바이트를 뒤에 패딩한다.
+    (요청에 대한 응답 size 측정 로직은 그대로 두고,
+    실제 파일 크기를 원본과 동일하게 맞추기 위한 용도)
+    """
+    try:
+        src_size = src.stat().st_size
+        dst_size = dst.stat().st_size
+    except Exception:
+        return
+
+    if src_size <= 0:
+        return
+    if dst_size >= src_size:
+        return
+
+    pad_len = src_size - dst_size
+    try:
+        with dst.open("ab") as f:
+            f.write(b"\x00" * pad_len)
+    except Exception:
+        # 패딩 실패해도 레댁션 자체는 성공한 것으로 보고 넘어간다.
+        return
 
 
 # === EAST 관련 함수들 ===
@@ -416,6 +443,10 @@ def _redact_image_file(saved: SavedFileInfo) -> RedactedFileInfo:
 
     red.save(redacted_path, format=fmt, **save_kwargs)
 
+    # === 원본 크기와 맞추기 위한 패딩 ===
+    _pad_file_to_match(saved.path, redacted_path)
+    # =================================
+
     return RedactedFileInfo(
         ext=saved.ext,
         mime=saved.mime,
@@ -593,6 +624,9 @@ def _redact_pdf_file(saved: SavedFileInfo) -> RedactedFileInfo:
                 f"{saved.path.stem}.redacted{saved.path.suffix}"
             )
             work.save(redacted_path, deflate=True)
+            # === 원본 크기와 맞추기 위한 패딩 ===
+            _pad_file_to_match(saved.path, redacted_path)
+            # =================================
         work.close()
 
     return RedactedFileInfo(

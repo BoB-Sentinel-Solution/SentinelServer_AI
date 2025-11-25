@@ -165,7 +165,7 @@ class DbLoggingService:
         에이전트로 돌려보낼 attachment JSON 생성.
         - format: 들어온 attachment.format 을 그대로 사용 (없으면 파일 확장자)
         - data: 처리된 파일을 base64로 인코딩
-        - size: (선택) 처리된 파일 바이트 크기
+        - size: 처리된 파일 바이트 크기 (len(raw))
         - file_change: 원본 파일 대비 내용 변화 여부 (bool)
         """
         if processed_path is None or not processed_path.exists():
@@ -218,6 +218,8 @@ class DbLoggingService:
             # 2) 이미지/스캔/PDF 등 → redaction 파이프라인
             else:
                 logger.info(f"[ATTACH] redact_saved_file: {saved.path} (ext={ext})")
+                # redact_saved_file 내부에서 레덱션 수행 후,
+                # 원본 파일 크기보다 작아지면 0x00 패딩으로 크기를 맞춰 저장하도록 구현됨.
                 red = redact_saved_file(saved)
                 logger.info(
                     f"[ATTACH] redacted result: original={red.original_path}, "

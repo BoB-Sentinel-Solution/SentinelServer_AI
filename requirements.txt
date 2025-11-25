@@ -42,7 +42,7 @@ SQLAlchemy==2.0.43
 starlette==0.48.0
 sympy==1.14.0
 tifffile==2025.10.4
-tokenizers==0.20.1
+tokenizers
 tqdm==4.67.1
 transformers==4.57.1
 typing-inspection==0.4.2

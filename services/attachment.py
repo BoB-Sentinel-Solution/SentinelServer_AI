@@ -29,15 +29,14 @@ _EXT_TO_MIME = {
 
 def _sanitize(s: str) -> str:
     """파일/디렉터리 이름에 쓸 문자열을 최소한으로 정규화.
-    
+
     - 콜론(:)은 윈도우 호환성을 위해 하이픈(-)으로 치환
     - 나머지 허용 문자 외에는 언더스코어(_)로 치환
     """
     s = s or "unknown"
-    # 1) 콜론을 먼저 하이픈으로 변환
+    # 1) 콜론을 먼저 하이픈으로 변환 (윈도우, SCP 호환)
     s = s.replace(":", "-")
     # 2) 파일명에 쓸 수 있는 안전한 문자만 남기고 나머지는 '_'로 치환
-    #    (콜론은 더 이상 허용하지 않음)
     return re.sub(r"[^A-Za-z0-9_.-]", "_", s)
 
 
@@ -51,7 +50,7 @@ class SavedFileInfo:
 
 def save_attachment_file(
     item: InItem,
-    downloads_root: Path = Path("./downloads"),
+    downloads_root: Optional[Path] = None,
 ) -> Optional[SavedFileInfo]:
     """
     에이전트에서 넘어온 attachment를 실제 파일로 저장하고 SavedFileInfo를 반환한다.
@@ -64,6 +63,14 @@ def save_attachment_file(
     if not att or not att.format or not att.data:
         return None
 
+    # 0) 기본 다운로드 루트 경로를 프로젝트 기준 절대경로로 고정
+    if downloads_root is None:
+        # services/attachment.py → services → 프로젝트 루트(SentinelServer_AI) → downloads
+        downloads_root = (Path(__file__).resolve().parent.parent / "downloads").resolve()
+
+    # 최상위 downloads 디렉터리 반드시 생성
+    downloads_root.mkdir(parents=True, exist_ok=True)
+
     # 1) 확장자 정규화
     fmt = att.format.strip().lower()
     if fmt.startswith("."):
@@ -72,7 +79,7 @@ def save_attachment_file(
     ext = fmt
     mime = _EXT_TO_MIME.get(ext, "")
 
-    # 2) 저장 디렉터리 구성: downloads_root / {public_ip} / {hostname}
+    # 2) 저장 디렉터리 구성: downloads_root / {public_ip} / {hostname or pc_name}
     subdir = (
         downloads_root
         / _sanitize(item.public_ip or "noip")

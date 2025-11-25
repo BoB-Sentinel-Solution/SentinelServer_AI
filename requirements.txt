@@ -42,7 +42,7 @@ SQLAlchemy==2.0.43
 starlette==0.48.0
 sympy==1.14.0
 tifffile==2025.10.4
-tokenizers
+tokenizers==0.22.1
 tqdm==4.67.1
 transformers==4.57.1
 typing-inspection==0.4.2
@@ -53,10 +53,10 @@ uvloop==0.21.0
 watchfiles==1.1.0
 websockets==15.0.1
 accelerate>=0.26.0
-PyMuPDF
-opencv-python
-python-docx
-python-pptx
-openpyxl
-python-magic
-opencv-python-headless
+PyMuPDF==1.26.6
+opencv-python==4.11.0.86
+python-docx==1.2.0
+python-pptx==1.0.2
+openpyxl==3.1.5
+python-magic==0.4.27
+opencv-python-headless==4.11.0.86

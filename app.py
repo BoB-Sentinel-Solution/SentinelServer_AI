@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from routers.logs import router as logs_router
 from routers.dashboard_api import router as dashboard_router
+from routers.mcp import router as mcp_router  # MCP 설정 전용 라우터 추가
 
 BASE_DIR = Path(__file__).resolve().parent
 DASHBOARD_DIR = BASE_DIR / "dashboard"  # index.html, app.js, vendor/*
@@ -29,6 +30,7 @@ app.mount(
 # ---------- API 라우터 ----------
 # ★ 핵심: API는 /api 로 분리 (정적과 충돌 방지)
 app.include_router(logs_router,      prefix="/api")
+app.include_router(mcp_router,       prefix="/api")  # ✅ /api/mcp 엔드포인트 등록
 app.include_router(dashboard_router, prefix="/api")
 
 # ---------- 보안 헤더 ----------

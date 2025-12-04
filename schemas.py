@@ -1,6 +1,5 @@
-# schemas.py
 from __future__ import annotations
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -99,3 +98,56 @@ class ServerOut(BaseModel):
 
     # 레댁션/디텍션 완료된 첨부파일 (없으면 None)
     attachment: Optional[Attachment] = None
+
+
+# ===================== MCP 설정 파일용 스키마 =====================
+
+class McpInItem(BaseModel):
+    """
+    에이전트에서 /api/mcp 로 보내는 MCP 설정 파일 정보
+    """
+    # 시간/식별
+    time: str
+    public_ip: Optional[str] = None
+    private_ip: Optional[str] = None
+
+    # LLM 환경 / 호스트 (예: 'claude', 'chatgpt', ...)
+    host: Optional[str] = None
+
+    # 에이전트가 보내는 PC 이름(여러 별칭 허용)
+    if _PYD_V2:
+        pc_name: Optional[str] = Field(
+            default=None,
+            validation_alias=AliasChoices("PCName", "pcName", "pc_name"),
+        )
+        model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    else:
+        pc_name: Optional[str] = Field(default=None, alias="pc_name")
+
+        class Config:
+            allow_population_by_field_name = True
+            extra = "ignore"
+
+        if root_validator:
+            @root_validator(pre=True)
+            def _merge_pcname_aliases(cls, values):
+                # 우선순위: PCName > pcName > pc_name
+                v = values.get("PCName") or values.get("pcName") or values.get("pc_name")
+                if v is not None:
+                    values["pc_name"] = v
+                return values
+
+    status: str                      # 'activate' or 'delete'
+    file_path: str                   # MCP 설정 파일 경로
+
+    # MCP 설정 원본 전체
+    config_raw: Dict[str, Any] = Field(default_factory=dict)
+
+
+class McpInResponse(BaseModel):
+    """
+    /api/mcp 응답: 저장 결과 요약
+    """
+    snapshot_id: str
+    mcp_scope: str                   # 'local' / 'external' / 'deleted'
+    total_servers: int               # 이번 스냅샷에서 파싱된 MCP 서버 수

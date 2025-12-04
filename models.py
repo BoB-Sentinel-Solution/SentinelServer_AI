@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 from db import Base
 from datetime import datetime
 
+
 class LogRecord(Base):
     """
     한 레코드 = 에이전트 요청 + AI 판별 결과
@@ -36,3 +37,48 @@ class LogRecord(Base):
 
     # 메타
     created_at      = Column(DateTime(timezone=True), default=datetime.now, nullable=False)
+
+
+class McpConfigEntry(Base):
+    """
+    한 레코드 = MCP 설정 스냅샷(snapshot_id) 안의 MCP 서버 1개
+
+    - 같은 snapshot_id 는 같은 MCP 설정 파일 상태(한 번 전송)를 의미
+    - status:
+        * 'activate' : 파일이 존재하고, 해당 시점의 MCP 설정 전체 스냅샷
+        * 'delete'   : MCP 설정 파일 자체가 삭제된 이벤트
+    - mcp_scope:
+        * 'local'     : 이 MCP 서버가 로컬(MCP 프로세스 / 로컬/사설 HTTP)에서 동작
+        * 'external'  : 이 MCP 서버가 외부 도메인/공인 IP HTTP MCP
+        * 'deleted'   : 파일 삭제 스냅샷 등 MCP 자체가 없는 이벤트 행에 사용 가능
+    """
+    __tablename__ = "mcp_config_entries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # 스냅샷 공통 메타 정보
+    snapshot_id  = Column(String(64), index=True, nullable=False)  # 같은 전송 묶음 ID
+    agent_time   = Column(String(32), nullable=False)              # 에이전트 JSON "time"
+    public_ip    = Column(String(45), nullable=False)
+    private_ip   = Column(String(45))
+    host         = Column(String(64), nullable=False)              # 예: 'claude'
+    pc_name      = Column(String(255), nullable=False)             # 예: 'enha0527'
+    status       = Column(String(32), nullable=False)              # 'activate' / 'delete'
+    file_path    = Column(Text, nullable=False)                    # MCP 설정 파일 경로
+
+    # MCP 설정 원본 전체 (config_raw 그대로)
+    config_raw_json = Column(JSON, nullable=False)
+
+    # MCP 서버 개별 정보
+    mcp_name    = Column(String(128))                              # 'github', 'ida-pro-mcp', ...
+    mcp_scope   = Column(String(32))                               # 'local' / 'external' / 'deleted'
+    server_type = Column(String(32))                               # 'process' / 'http'
+
+    command     = Column(Text)                                     # process형 command
+    args_json   = Column(JSON)                                     # args 배열
+    env_json    = Column(JSON)                                     # env 딕셔너리
+    url         = Column(Text)                                     # http형 URL
+    headers_json = Column(JSON)                                    # http형 headers
+
+    # 메타
+    created_at  = Column(DateTime(timezone=True), default=datetime.now, nullable=False)

@@ -170,16 +170,37 @@
   font-size: 0.85rem;
 }
 
+/* 공통 메뉴 아이템 */
 .top-menu-item {
   padding-bottom: 4px;
   border-bottom: 2px solid transparent;
   cursor: pointer;
-  opacity: 0.7;
+
+  /* 색 + 두께 통일 */
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+
+  opacity: 0.6;
+  transition:
+    opacity 0.15s ease,
+    border-bottom-color 0.15s ease,
+    color 0.15s ease;
 }
 
+/* 호버 시 살짝 강조 */
+.top-menu-item:hover {
+  opacity: 0.9;
+  border-bottom-color: rgba(255, 255, 255, 0.4);
+}
+
+/* 현재 위치한 카테고리 (굵게 + 완전 흰색) */
 .top-menu-item--active {
-  border-bottom-color: #ffffff;
+  color: #ffffff;
+  font-weight: 700;
   opacity: 1;
+  border-bottom-color: #ffffff;
 }
 
 .top-nav-right {

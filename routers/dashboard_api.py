@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
++import re
 from typing import Dict, List, Any
 from collections import defaultdict
 from datetime import datetime, date
@@ -12,9 +13,16 @@ from sqlalchemy import cast, Text, func  # JSON 검색 + interface 필터용
 
 from db import SessionLocal, Base, engine
 from models import LogRecord
+from models import LogRecord, McpConfigEntry
 from config import settings
 
 router = APIRouter()  # 접두는 app.py에서 prefix="/api"로 부여
+
+# https://123.45.67.89/ 이런 형태의 URL 탐지용 정규표현식
+IP_URL_RE = re.compile(
+    r"^https?://(?:(?:\d{1,3}\.){3}\d{1,3})(?::\d+)?(?:/|$)",
+    re.IGNORECASE,
+)
 
 # 운영에서는 Alembic 권장. 개발 편의를 위해 안전 생성.
 Base.metadata.create_all(bind=engine)
@@ -379,4 +387,208 @@ def list_logs(
         "total": total,
         "page": page,
         "page_size": page_size,
+    }
+
+@router.get("/mcp/config_summary")
+def mcp_config_summary(db: Session = Depends(get_db)):
+    """
+    MCP 설정 파일 기반 CONFIG 리포트 요약
+
+    - active_total: 현재 활성화된 MCP 서버 개수
+    - active_rank: MCP 이름별 활성 개수 순위
+    - type_distribution: local / external / other 비율
+    - timeline: 최근 스냅샷 기준 등록/변경/삭제 타임라인
+    - prediction: 정규표현식을 이용한 URL 기반 악성 징후 진단 결과
+    """
+
+    # ---- 1) 현재 활성 스냅샷 (pc_name+host+file_path 별 최신) ----
+    latest_sub = (
+        db.query(
+            McpConfigEntry.pc_name.label("pc_name"),
+            McpConfigEntry.host.label("host"),
+            McpConfigEntry.file_path.label("file_path"),
+            func.max(McpConfigEntry.agent_time).label("max_time"),
+        )
+        .group_by(
+            McpConfigEntry.pc_name,
+            McpConfigEntry.host,
+            McpConfigEntry.file_path,
+        )
+        .subquery()
+    )
+
+    current_entries: List[McpConfigEntry] = (
+        db.query(McpConfigEntry)
+        .join(
+            latest_sub,
+            (McpConfigEntry.pc_name == latest_sub.c.pc_name)
+            & (McpConfigEntry.host == latest_sub.c.host)
+            & (McpConfigEntry.file_path == latest_sub.c.file_path)
+            & (McpConfigEntry.agent_time == latest_sub.c.max_time),
+        )
+        .filter(func.lower(McpConfigEntry.status) != "delete")
+        .all()
+    )
+
+    # ---- 2) 활성 MCP 개수 / 순위 / 타입 분포 ----
+    active_total = sum(1 for e in current_entries if e.mcp_name)
+
+    rank_counts: Dict[str, int] = {}
+    type_dist = {"local": 0, "external": 0, "other": 0}
+
+    for e in current_entries:
+        name = (e.mcp_name or "UNKNOWN").strip() or "UNKNOWN"
+        rank_counts[name] = rank_counts.get(name, 0) + 1
+
+        scope = (e.mcp_scope or "").lower()
+        if scope == "local":
+            type_dist["local"] += 1
+        elif scope == "external":
+            type_dist["external"] += 1
+        else:
+            type_dist["other"] += 1
+
+    active_rank = [
+        {"mcp_name": name, "count": count}
+        for name, count in sorted(
+            rank_counts.items(), key=lambda kv: kv[1], reverse=True
+        )
+    ]
+
+    # ---- 3) 최근 스냅샷 기반 타임라인 ----
+    # snapshot_id 별 최신 시간만 뽑아서 50개 제한
+    snap_rows = (
+        db.query(
+            McpConfigEntry.snapshot_id,
+            func.max(McpConfigEntry.agent_time).label("agent_time"),
+        )
+        .group_by(McpConfigEntry.snapshot_id)
+        .order_by(func.max(McpConfigEntry.agent_time).desc())
+        .limit(50)
+        .all()
+    )
+
+    snap_ids = [r.snapshot_id for r in snap_rows]
+    timeline: List[Dict[str, Any]] = []
+
+    if snap_ids:
+        all_snap_entries: List[McpConfigEntry] = (
+            db.query(McpConfigEntry)
+            .filter(McpConfigEntry.snapshot_id.in_(snap_ids))
+            .all()
+        )
+
+        # snapshot_id -> 메타 + 엔트리 목록
+        snaps: Dict[str, Dict[str, Any]] = {}
+        for e in all_snap_entries:
+            s = snaps.setdefault(
+                e.snapshot_id,
+                {
+                    "agent_time": e.agent_time,
+                    "pc_name": e.pc_name,
+                    "private_ip": e.private_ip,
+                    "host": e.host,
+                    "file_path": e.file_path,
+                    "status": e.status,
+                    "entries": [],
+                },
+            )
+            s["entries"].append(e)
+
+        # 등록/변경/삭제 판별용: pc_name+host+file_path 기준으로 과거 존재 여부 체크
+        sorted_by_time = sorted(
+            snaps.values(), key=lambda x: (x["agent_time"] or "")
+        )
+        seen_keys = set()
+        for snap in sorted_by_time:
+            key = (snap["pc_name"], snap["host"], snap["file_path"])
+            st = (snap["status"] or "").lower()
+            if st == "delete":
+                event = "삭제"
+            else:
+                event = "등록" if key not in seen_keys else "변경"
+            snap["event"] = event
+            seen_keys.add(key)
+
+        # 최신 순으로 10개만 타임라인에 노출
+        latest_snaps = sorted(
+            snaps.values(),
+            key=lambda x: (x["agent_time"] or ""),
+            reverse=True,
+        )[:10]
+
+        for snap in latest_snaps:
+            entries = snap["entries"]
+            names = sorted(
+                {e.mcp_name for e in entries if e.mcp_name}
+            )
+            if not names:
+                mcp_label = "-"
+            elif len(names) == 1:
+                mcp_label = names[0]
+            else:
+                mcp_label = f"{names[0]} 외 {len(names) - 1}개"
+
+            scopes = { (e.mcp_scope or "").lower() for e in entries if e.mcp_scope }
+            if "external" in scopes:
+                type_label = "Remote"
+            elif "local" in scopes:
+                type_label = "Local"
+            else:
+                type_label = "기타"
+
+            timeline.append(
+                {
+                    "time": snap["agent_time"],
+                    "event": snap.get("event", ""),
+                    "pc_name": snap["pc_name"],
+                    "private_ip": snap["private_ip"],
+                    "host": snap["host"],
+                    "mcp": mcp_label,
+                    "type": type_label,
+                }
+            )
+
+    # ---- 4) 정규표현식 기반 악성 징후(PREDICTION) ----
+    suspicious_entries: List[McpConfigEntry] = []
+    for e in current_entries:
+        url = (e.url or "").strip()
+        if not url:
+            continue
+        if IP_URL_RE.search(url):
+            suspicious_entries.append(e)
+
+    if suspicious_entries:
+        sus_mcp_names = sorted(
+            { (e.mcp_name or "UNKNOWN") for e in suspicious_entries }
+        )
+        prediction = {
+            "has_suspicious": True,
+            "headline": "일부 MCP 서버 URL에서 직접 IP 기반 접속이 감지되었습니다.",
+            "detail": (
+                "현재 활성 MCP 중 "
+                f"{len(sus_mcp_names)}개({', '.join(sus_mcp_names[:3])}"
+                f"{' 등' if len(sus_mcp_names) > 3 else ''})의 URL이 "
+                "https://IP 형태로 설정되어 있습니다. "
+                "내부 테스트용이 아니라면, 도메인 기반 접속 및 서버 신뢰도 검토가 필요합니다."
+            ),
+        }
+    else:
+        prediction = {
+            "has_suspicious": False,
+            "headline": "현재 MCP 설정에서 명백한 악성 징후는 발견되지 않았습니다.",
+            "detail": (
+                "활성화된 MCP 서버들의 URL에서 직접 IP 기반 https 접속은 "
+                "정규표현식 검사 기준으로 확인되지 않았습니다. "
+                "현 시점에서는 기본 형식 상의 위험 요소는 낮은 편입니다."
+            ),
+        }
+
+    return {
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "active_total": active_total,
+        "active_rank": active_rank,
+        "type_distribution": type_dist,
+        "timeline": timeline,
+        "prediction": prediction,
     }

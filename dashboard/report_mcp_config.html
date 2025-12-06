@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel Report · MCP Config</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+
+    <!-- MCP Config 전용 약간의 보조 스타일 -->
+    <style>
+      .mcp-active-body {
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+      }
+      .mcp-active-pill {
+        min-width: 110px;
+        height: 110px;
+        border-radius: 999px;
+        background: var(--bg-card-alt);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+      .mcp-active-pill-main {
+        font-size: 2rem;
+        font-weight: 700;
+      }
+      .mcp-active-pill-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .mcp-rank-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .mcp-rank-list li {
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 0;
+        font-size: 0.9rem;
+      }
+      .mcp-rank-name {
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .mcp-rank-count {
+        font-weight: 600;
+      }
+      .prediction-status {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+      .prediction-title {
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .prediction-body {
+        font-size: 0.85rem;
+        line-height: 1.5;
+      }
+      .prediction-footnote {
+        margin-top: 8px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+      .empty-hint {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-top: 8px;
+      }
+      .table-wrapper {
+        max-height: 260px;
+        overflow: auto;
+      }
+      .mcp-config-table th,
+      .mcp-config-table td {
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+
+  <body class="sentinel-body">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+          <a class="top-menu-item top-menu-item--active" href="./report.html">
+            Report
+          </a>
+          <a class="top-menu-item" href="./logs.html">Logs</a>
+          <a class="top-menu-item" href="#">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <main class="report-layout">
+      <!-- LLM / MCP 탭 -->
+      <section class="report-tabs-row">
+        <div class="report-tabs">
+          <a class="report-tab" href="./report.html">LLM</a>
+          <a
+            class="report-tab report-tab--active"
+            href="./report_mcp_info.html"
+            >MCP</a
+          >
+        </div>
+      </section>
+
+      <section class="report-content">
+        <!-- 좌측 사이드 메뉴 -->
+        <aside class="report-side-nav">
+          <!-- MCP 카테고리 -->
+          <section class="side-section">
+            <h3 class="side-section-title">OVERALL</h3>
+            <a href="./report_mcp_info.html" class="side-menu-item">
+              MCP 서버 사용 순위
+            </a>
+            <a href="./report_mcp_info.html" class="side-menu-item">
+              MCP 사용량
+            </a>
+          </section>
+
+          <section class="side-section">
+            <h3 class="side-section-title">INFORMATION BASED</h3>
+            <a href="./report_mcp_information.html" class="side-menu-item">
+              중요정보 탐지
+            </a>
+            <a href="./report_mcp_information.html" class="side-menu-item">
+              서비스별 중요 정보 탐지
+            </a>
+            <a href="./report_mcp_information.html" class="side-menu-item">
+              MCP 사용량 추이
+            </a>
+          </section>
+
+          <section class="side-section side-section--active">
+            <h3 class="side-section-title">CONFIG</h3>
+            <a
+              href="./report_mcp_config.html"
+              class="side-menu-item side-menu-item--active"
+            >
+              활성화된 MCP 개수
+            </a>
+            <a href="./report_mcp_config.html" class="side-menu-item">
+              활성화된 MCP 타입 분포
+            </a>
+            <a href="./report_mcp_config.html" class="side-menu-item">
+              시간대별 업데이트된 MCP 목록
+            </a>
+            <a href="./report_mcp_config.html" class="side-menu-item">
+              호스트별 활성 MCP 개수 순위
+            </a>
+          </section>
+        </aside>
+
+        <!-- 메인 카드 영역 -->
+        <section class="report-main">
+          <!-- 1행 : 활성 MCP 개수 + 타임라인 -->
+          <div class="report-row report-row--top">
+            <!-- 활성 MCP 개수 / 순위 -->
+            <article class="card report-card report-card--half">
+              <header class="card-header">
+                <h3 class="card-title">활성화된 MCP 개수</h3>
+                <span class="card-subtitle">
+                  현재 에이전트에서 사용 중인 MCP 서버 수와 상위 순위
+                </span>
+              </header>
+              <div class="card-body mcp-active-body">
+                <div class="mcp-active-pill">
+                  <span
+                    id="mcp-active-total"
+                    class="mcp-active-pill-main"
+                    >--</span
+                  >
+                  <span class="mcp-active-pill-label">활성화된 MCP 개수</span>
+                </div>
+
+                <div class="mcp-active-rank">
+                  <h4 class="card-subtitle">활성 MCP 개수 순위</h4>
+                  <ol id="mcp-active-rank-list" class="mcp-rank-list">
+                    <li>
+                      <span>데이터를 불러오는 중...</span>
+                    </li>
+                  </ol>
+                </div>
+              </div>
+            </article>
+
+            <!-- 시간대별 업데이트 타임라인 -->
+            <article class="card report-card report-card--half">
+              <header class="card-header">
+                <h3 class="card-title">시간대별 업데이트된 MCP 타임라인</h3>
+                <span class="card-subtitle">
+                  최근 스냅샷 기준 MCP 등록 / 변경 / 삭제 이력
+                </span>
+              </header>
+              <div class="card-body">
+                <div class="table-wrapper">
+                  <table class="table mcp-config-table">
+                    <thead>
+                      <tr>
+                        <th>Time</th>
+                        <th>Event</th>
+                        <th>PC Name</th>
+                        <th>Private IP</th>
+                        <th>LLM 환경</th>
+                        <th>해당 MCP</th>
+                        <th>Type</th>
+                      </tr>
+                    </thead>
+                    <tbody id="mcp-timeline-body">
+                      <tr>
+                        <td colspan="7">데이터를 불러오는 중...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <!-- 2행 : 타입 분포 + Prediction -->
+          <div class="report-row">
+            <!-- 타입 분포 -->
+            <article class="card report-card report-card--half">
+              <header class="card-header">
+                <h3 class="card-title">활성화된 MCP 타입 분포</h3>
+                <span class="card-subtitle">
+                  Local / Remote / 기타 MCP 사용 비율
+                </span>
+              </header>
+              <div class="card-body">
+                <canvas
+                  id="chart-mcp-type-distribution"
+                  height="220"
+                ></canvas>
+                <p
+                  id="mcp-type-empty"
+                  class="empty-hint"
+                  style="display: none"
+                >
+                  현재 활성화된 MCP 서버가 없습니다.
+                </p>
+              </div>
+            </article>
+
+            <!-- Prediction -->
+            <article class="card report-card report-card--half">
+              <header class="card-header">
+                <h3 class="card-title">PREDICTION</h3>
+                <span class="card-subtitle">
+                  MCP 설정 파일 기반 간단 악성 징후 분석
+                </span>
+              </header>
+              <div class="card-body">
+                <p class="prediction-status">
+                  상태:
+                  <strong id="mcp-pred-status">분석 중...</strong>
+                </p>
+                <p class="prediction-title" id="mcp-pred-title">
+                  MCP 설정을 분석하는 중입니다.
+                </p>
+                <p class="prediction-body" id="mcp-pred-body">
+                  활성화된 MCP 서버의 URL과 설정 값을 정규표현식으로 검사하여,
+                  https://IP 형태의 직접 접속 등 기본적인 악성 징후를 점검합니다.
+                </p>
+                <p class="prediction-footnote">
+                  * 예: <code>https://123.45.67.89/...</code> 처럼 도메인 대신
+                  IP가 사용된 경우를 자동으로 탐지합니다.
+                </p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/report_mcp_config.js"></script>
+  </body>
+</html>

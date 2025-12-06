@@ -46,51 +46,60 @@
         </div>
       </section>
 
-      <!-- 좌측 사이드 메뉴 -->
-      <aside class="report-side-nav">
-        <!-- MCP 카테고리 -->
-        <section class="side-section">
-          <h3 class="side-section-title">OVERALL</h3>
-          <a href="./report_mcp_info.html" class="side-menu-item">
+      <!-- 메인 2컬럼 레이아웃 (좌: 사이드바 / 우: 콘텐츠) -->
+  <section class="report-main">
+    <!-- 좌측 사이드 메뉴 -->
+    <aside class="report-sidebar">
+      <div class="report-sidebar-inner">
+        <!-- OVERALL -->
+        <div class="side-group">
+          <div class="side-group-title">| OVERALL</div>
+          <a class="side-link" href="./report_mcp_info.html">
             MCP 서버 사용 순위
           </a>
-          <a href="./report_mcp_info.html" class="side-menu-item">
+          <a class="side-link" href="./report_mcp_info.html">
             MCP 사용량
           </a>
-        </section>
+        </div>
 
-        <section class="side-section side-section--active">
-          <h3 class="side-section-title">INFORMATION BASED</h3>
-          <a href="./report_mcp_information.html" class="side-menu-item side-menu-item--active">
+        <!-- INFORMATION BASED (현재 페이지) -->
+        <div class="side-group">
+          <div class="side-group-title">| INFORMATION BASED</div>
+          <a
+            class="side-link side-link--active"
+            href="./report_mcp_information.html"
+          >
             중요정보 탐지
           </a>
-          <a href="./report_mcp_information.html" class="side-menu-item">
+          <a class="side-link" href="./report_mcp_information.html">
             서비스별 중요 정보 탐지
           </a>
-          <a href="./report_mcp_information.html" class="side-menu-item">
+          <a class="side-link" href="./report_mcp_information.html">
             MCP 사용량 추이
           </a>
-        </section>
+        </div>
 
-        <section class="side-section">
-          <h3 class="side-section-title">CONFIG</h3>
-          <a href="./report_mcp_config.html" class="side-menu-item">
+        <!-- CONFIG -->
+        <div class="side-group">
+          <div class="side-group-title">| CONFIG</div>
+          <a class="side-link" href="./report_mcp_config.html">
             활성화된 MCP 개수
           </a>
-          <a href="./report_mcp_config.html" class="side-menu-item">
+          <a class="side-link" href="./report_mcp_config.html">
             활성화된 MCP마다의 타임 분포
           </a>
-          <a href="./report_mcp_config.html" class="side-menu-item">
+          <a class="side-link" href="./report_mcp_config.html">
             시간대별 업데이트된 MCP 목록
           </a>
-          <a href="./report_mcp_config.html" class="side-menu-item">
+          <a class="side-link" href="./report_mcp_config.html">
             호스트별 활성 MCP 개수 순위
           </a>
-        </section>
-      </aside>
+        </div>
+      </div>
+    </aside>
 
       <!-- 우측 메인 콘텐츠 -->
-      <section class="report-main">
+      <section class="report-content">
         <!-- 상단 필터 / 위험지수 영역 -->
         <div class="report-header-bar">
           <div class="report-range-switch">

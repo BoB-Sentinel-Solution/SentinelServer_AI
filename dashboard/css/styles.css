@@ -656,49 +656,76 @@
   gap: 20px;
 }
 
-/* 좌측 사이드바 */
+/* -----------------------
+   좌측 사이드바
+------------------------ */
+
 .report-sidebar {
   background: #f5f7fb;
   border-radius: 16px;
-  padding: 16px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  border: 1px solid #e0e4f2;
+  padding: 14px 12px;
   font-size: 12px;
 }
 
-.report-sidebar-group {
-  border-left: 3px solid transparent;
-  padding-left: 8px;
-}
-
-.report-sidebar-group--active {
-  border-left-color: #3a6bff;
-}
-
-.report-sidebar-group-title {
-  font-weight: 700;
-  margin-bottom: 6px;
-  color: #2c3145;
-}
-
-.report-sidebar-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.report-sidebar-inner {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 10px;
 }
 
-.report-sidebar-item {
-  cursor: default;
+/* 그룹 한 덩어리 (OVERALL / TIME BASED / ...) */
+.side-group {
+  padding: 8px 8px 10px;
+  border-left: 2px solid transparent;
+  border-radius: 10px;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+/* 현재 페이지가 속해있는 그룹 강조 (브라우저 최신: :has 지원) */
+.side-group:has(.side-link--active) {
+  border-left-color: #3a6bff;
+  background: #eef2ff;
+}
+
+/* 그룹 타이틀 */
+.side-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2c3145;
+  margin-bottom: 6px;
+}
+
+/* 개별 링크 */
+.side-link {
+  display: block;
+  padding: 4px 6px;
+  margin: 1px 0;
+  border-radius: 6px;
   color: #6b7083;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
-.report-sidebar-item--active {
-  font-weight: 600;
+/* hover 시 살짝 강조 */
+.side-link:hover {
+  background-color: rgba(58, 107, 255, 0.06);
+  color: #283152;
+}
+
+/* 현재 페이지 링크 (굵게 + 흰 배경 + 그림자) */
+.side-link--active {
+  background: #ffffff;
   color: #1b2340;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(30, 50, 120, 0.18);
 }
 
 /* 우측 컨텐츠 영역 */

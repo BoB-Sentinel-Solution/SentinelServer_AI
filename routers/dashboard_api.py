@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import json
-+import re
+import re
+import ipaddress
 from typing import Dict, List, Any
 from collections import defaultdict
 from datetime import datetime, date
@@ -12,7 +13,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import cast, Text, func  # JSON 검색 + interface 필터용
 
 from db import SessionLocal, Base, engine
-from models import LogRecord
 from models import LogRecord, McpConfigEntry
 from config import settings
 
@@ -591,4 +591,174 @@ def mcp_config_summary(db: Session = Depends(get_db)):
         "type_distribution": type_dist,
         "timeline": timeline,
         "prediction": prediction,
+    }
+
+@router.get("/network/summary", dependencies=[Depends(require_admin)])
+def network_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    네트워크 리포트(외부 IP / 사설망 / 의심 PC)용 요약 데이터.
+
+    - public_band_usage: 공인 IP /16 대역별 사용 건수
+    - public_band_count: 공인 IP 대역 개수 (PUBLIC 대역 개수 카드)
+    - top_private_bands: 공인 IP 대역 기준 상위 3개 사설망 정보
+    - suspicious_pcs: 외부 IP 사용 의심 PC 요약 (직접 노출 / 신규 출구)
+    - suspicious_logs: 의심 PC 관련 로그 테이블용 레코드
+    """
+
+    # 모든 로그 (추후 기간 필터링이 필요하면 여기서 where 조건 추가)
+    rows: List[LogRecord] = (
+        db.query(LogRecord)
+        .order_by(LogRecord.created_at.asc())
+        .all()
+    )
+
+    # 1) 공인 IP 대역 사용 현황 (PUBLIC 대역)
+    # key: "A.B.*"  (/16 대역)
+    public_band_usage: Dict[str, int] = defaultdict(int)
+
+    # 2) 공인 IP 대역별 연결 사설망 정보
+    band_private_bands: Dict[str, set] = defaultdict(set)   # 사설망 /16 대역 집합
+    band_pc_names: Dict[str, set] = defaultdict(set)        # 해당 대역 사용하는 PCName 집합
+    band_sensitive_count: Dict[str, int] = defaultdict(int) # 중요정보 탐지 건수
+
+    # 3) 외부 IP 사용 의심 PC 정보
+    # key = (public_ip, private_ip, pc_name)
+    suspicious_map: Dict[tuple, Dict[str, Any]] = {}
+
+    # 4) 의심 로그 목록 (테이블용)
+    suspicious_logs: List[Dict[str, Any]] = []
+
+    for r in rows:
+        pub = (r.public_ip or "").strip()
+        priv = (r.private_ip or "").strip()
+        pc_name = (r.hostname or "").strip() or "UNKNOWN"
+        created = r.created_at
+        created_str = created.isoformat() if created else (r.time or "")
+
+        # ---------- 공인 IP 대역 집계 (PUBLIC 대역 개수 / 대역폭 사용 현황) ----------
+        if pub:
+            try:
+                ip_obj = ipaddress.ip_address(pub)
+                # 공인 IP만 대상 (사설/루프백 등은 제외)
+                if ip_obj.is_global:
+                    octets = pub.split(".")
+                    if len(octets) == 4:
+                        band = f"{octets[0]}.{octets[1]}.*"
+                        public_band_usage[band] += 1
+
+                        # 이 PUBLIC 대역을 사용하는 사설망 대역 목록 (PRIVATE IP 기준)
+                        if priv:
+                            try:
+                                priv_obj = ipaddress.ip_address(priv)
+                                if priv_obj.is_private:
+                                    po = priv.split(".")
+                                    if len(po) == 4:
+                                        priv_band = f"{po[0]}.{po[1]}.*"
+                                        band_private_bands[band].add(priv_band)
+                            except ValueError:
+                                pass
+
+                        band_pc_names[band].add(pc_name)
+                        if r.has_sensitive:
+                            band_sensitive_count[band] += 1
+            except ValueError:
+                # 잘못된 IP 문자열은 무시
+                pass
+
+        # ---------- 외부 IP 사용 의심 PC 판별 ----------
+        reason = None
+
+        # (1) PUBLIC IP == PRIVATE IP  → 직접 인터넷 노출
+        if pub and priv and pub == priv:
+            reason = "direct_exposure"
+
+        # (2) PRIVATE IP가 사설대역이 아님 → 신규 출구
+        elif priv:
+            try:
+                priv_obj = ipaddress.ip_address(priv)
+                if not priv_obj.is_private:
+                    reason = "new_egress"
+            except ValueError:
+                # IP 형식이 아니면 무시
+                pass
+
+        if reason:
+            key = (pub, priv, pc_name)
+            prev = suspicious_map.get(key)
+            # 같은 조합이면 더 최근 시간으로 갱신
+            if not prev or prev["last_time"] < created_str:
+                suspicious_map[key] = {
+                    "public_ip": pub,
+                    "private_ip": priv,
+                    "pc_name": pc_name,
+                    "reason": reason,        # "direct_exposure" or "new_egress"
+                    "last_time": created_str,
+                }
+
+            # 이 로그도 "외부 IP 사용 의심 PC 로그" 테이블에 포함
+            suspicious_logs.append({
+                "time": created_str,
+                "host": r.host,
+                "pc_name": pc_name,
+                "public_ip": pub,
+                "private_ip": priv,
+                "interface": r.interface,
+                "action": r.action,
+                "allow": r.allow,
+                "has_sensitive": r.has_sensitive,
+                "file_blocked": r.file_blocked,
+                "entities": r.entities or [],
+                "prompt": (
+                    (r.prompt[:120] + "…")
+                    if r.prompt and len(r.prompt) > 120
+                    else (r.prompt or "")
+                ),
+            })
+
+    # ---------- 대역폭 별 연결 사설망 (상위 3개) ----------
+    band_items: List[Dict[str, Any]] = []
+    for band, cnt in public_band_usage.items():
+        priv_bands = sorted(band_private_bands.get(band, []))
+        band_items.append({
+            "public_band": band,                         # 예: "221.111.*"
+            "total_logs": cnt,                           # 이 PUBLIC 대역으로 나간 전체 로그 수
+            "private_band_count": len(priv_bands),       # 연결된 사설망 /16 대역 수
+            "private_bands": priv_bands,                 # ["192.168.*", "172.16.*", ...]
+            "pc_count": len(band_pc_names.get(band, [])),
+            "sensitive_count": band_sensitive_count.get(band, 0),
+        })
+
+    # 사용량 기준 내림차순 정렬 후 상위 3개만 카드용으로 사용
+    top_private_bands = sorted(
+        band_items, key=lambda x: x["total_logs"], reverse=True
+    )[:3]
+
+    # ---------- 외부 IP 사용 의심 PC 정보 (카드용) ----------
+    suspicious_pcs = sorted(
+        suspicious_map.values(),
+        key=lambda x: x["last_time"],
+        reverse=True,
+    )[:20]  # 카드에는 최대 20개만
+
+    # 로그 테이블도 최신순 50개로 제한
+    suspicious_logs = sorted(
+        suspicious_logs,
+        key=lambda x: x["time"],
+        reverse=True,
+    )[:50]
+
+    return {
+        # PUBLIC 대역 개수 카드 + PUBLIC 대역 파이 차트
+        "public_band_usage": dict(public_band_usage),   # { "221.111.*": 10, ... }
+        "public_band_count": len(public_band_usage),    # 예: 12
+
+        # 대역폭 별 연결 사설망 (상위 3개 카드)
+        "top_private_bands": top_private_bands,
+
+        # 외부 IP 사용 의심 PC 정보 카드
+        #  - 각 원소: {public_ip, private_ip, pc_name, reason("direct_exposure"/"new_egress"), last_time}
+        "suspicious_pcs": suspicious_pcs,
+
+        # 외부 IP 사용 의심 PC 로그 테이블
+        "suspicious_logs": suspicious_logs,
     }

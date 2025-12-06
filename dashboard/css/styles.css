@@ -734,6 +734,29 @@
   align-items: center;
 }
 
+/* -----------------------------
+   REPORT 공통 2열 카드 행 레이아웃
+   - report_mcp_info, network.html 등에서 사용
+----------------------------- */
+
+/* 한 줄에 카드 2개씩 배치 */
+.report-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* 첫 번째 행 등 위 여백 조금 주고 싶을 때 */
+.report-row--top {
+  margin-bottom: 16px;
+}
+
+/* 이름만 맞추는 용도(반 너비 카드) – 필요 시 확장 가능 */
+.report-card--half {
+  width: 100%;
+}
+
+
 /* 차트 캔버스 */
 .report-chart {
   width: 100%;

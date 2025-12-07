@@ -13,14 +13,13 @@ from schemas import McpInItem, McpInResponse
 
 
 class McpLoggingService:
-
     @staticmethod
     def _classify_server_type_and_scope(conf: Dict[str, Any]) -> tuple[str, str]:
         """
-        개별 MCP 서버 설정(conf) 에 대해
+        개별 MCP 서버 설정(conf)에 대해
         - server_type: 'process' or 'http'
         - server_scope: 'local' or 'external'
-        를 판별
+        를 판별 (server_scope는 스냅샷 전체 mcp_scope 계산에만 사용, DB에는 직접 저장하지 않음)
         """
         # 1) 타입 판별
         if conf.get("type") == "http" or "url" in conf:
@@ -59,8 +58,12 @@ class McpLoggingService:
     def _calc_mcp_scope(status: str, server_scopes: List[str]) -> str:
         """
         스냅샷 전체 기준 mcp_scope 계산
+
         - status == 'delete' → 'deleted'
-        - 그 외: 하나라도 external 이면 'external', 아니면 'local'
+        - 그 외:
+            * 하나라도 external 이면 'external'
+            * 모두 local 이면 'local'
+            * (서버가 없으면 기본 'local')
         """
         st = (status or "").lower()
         if st == "delete":
@@ -83,12 +86,14 @@ class McpLoggingService:
         status = (item.status or "").lower()
         file_path = item.file_path
 
+        # 원본 config_raw 전체
         config_raw = item.config_raw or {}
         mcp_servers = {}
         if isinstance(config_raw, dict):
             mcp_servers = config_raw.get("mcpServers") or {}
 
         # 1) 서버별 타입/스코프 먼저 계산
+        #    (name, conf, server_type, server_scope) 리스트
         servers_data: List[tuple[str, Dict[str, Any], str, str]] = []
         server_scopes: List[str] = []
 
@@ -100,7 +105,7 @@ class McpLoggingService:
                 servers_data.append((str(name), conf, server_type, server_scope))
                 server_scopes.append(server_scope)
 
-        # 2) 스냅샷 전체 mcp_scope 계산
+        # 2) 스냅샷 전체 mcp_scope 계산 (행마다 동일하게 들어감)
         mcp_scope = McpLoggingService._calc_mcp_scope(status, server_scopes)
 
         entries: List[McpConfigEntry] = []
@@ -109,6 +114,7 @@ class McpLoggingService:
         if servers_data:
             for name, conf, server_type, server_scope in servers_data:
                 entry = McpConfigEntry(
+                    # 스냅샷 공통 메타
                     snapshot_id     = snapshot_id,
                     agent_time      = agent_time,
                     public_ip       = public_ip,
@@ -117,12 +123,13 @@ class McpLoggingService:
                     pc_name         = pc_name,
                     status          = status,
                     file_path       = file_path,
-                    mcp_scope       = mcp_scope,
+                    mcp_scope       = mcp_scope,     # 스냅샷 기준 scope
                     config_raw_json = config_raw,
 
+                    # MCP 서버 개별 정보
                     mcp_name     = name,
-                    server_type  = server_type,
-                    server_scope = server_scope,
+                    server_type  = server_type,      # 'process' / 'http'
+                    # server_scope는 DB에 별도 컬럼 없음 (local/external 정보는 mcp_scope 계산에만 사용)
                     command      = conf.get("command"),
                     args_json    = conf.get("args"),
                     env_json     = conf.get("env"),
@@ -146,7 +153,6 @@ class McpLoggingService:
 
                 mcp_name     = None,
                 server_type  = None,
-                server_scope = None,
                 command      = None,
                 args_json    = None,
                 env_json     = None,

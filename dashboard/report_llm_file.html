@@ -7,9 +7,165 @@
 
     <link rel="stylesheet" href="./vendor/reset.min.css" />
     <link rel="stylesheet" href="./css/styles.css" />
+
+    <!-- 이 페이지 전용 스타일 -->
+    <style>
+      /* 레이아웃 전체 여백 */
+      .report-file-page .report-layout {
+        max-width: 1440px;
+        margin: 24px auto 40px;
+        padding: 0 24px;
+      }
+
+      /* 메인 2컬럼 (좌: 사이드바 / 우: 컨텐츠) */
+      .report-file-page .report-content {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+        gap: 20px;
+      }
+
+      /* 사이드바 카드를 좀 더 세로로 */
+      .report-file-page .report-sidebar {
+        background: #f5f7fb;
+        border-radius: 16px;
+        padding: 16px 14px;
+        font-size: 12px;
+      }
+
+      .report-file-page .report-sidebar-inner {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .report-file-page .side-group-title {
+        font-weight: 700;
+        color: #2c3145;
+        margin-bottom: 6px;
+      }
+
+      .report-file-page .side-link {
+        display: block;
+        padding: 4px 8px;
+        border-radius: 8px;
+        font-size: 12px;
+        color: #6b7083;
+        text-decoration: none;
+      }
+
+      .report-file-page .side-link:hover {
+        background: #e5ecff;
+        color: #1b2340;
+      }
+
+      .report-file-page .side-link--active {
+        background: #ffffff;
+        color: #1b2340;
+        font-weight: 600;
+        box-shadow: 0 1px 3px rgba(20, 40, 80, 0.12);
+      }
+
+      /* 우측 메인 영역: 행/카드 배치 */
+      .report-file-page .report-main {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .report-file-page .report-row {
+        display: flex;
+        gap: 20px;
+      }
+
+      .report-file-page .report-card--half {
+        flex: 1 1 0;
+      }
+
+      .report-file-page .report-card--full {
+        flex: 1 1 100%;
+      }
+
+      /* 도넛 카드 중앙 정렬 */
+      .report-file-page .card-body--center {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 260px;
+      }
+
+      .report-file-page #chart-file-ext-donut {
+        max-width: 260px;
+      }
+
+      /* 스택 막대 카드 높이 살짝 확보 */
+      .report-file-page #card-file-stack .card-body {
+        min-height: 280px;
+      }
+
+      /* 카드 하단 노트 */
+      .report-file-page .card-note {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #8b90a5;
+        text-align: center;
+      }
+
+      /* 처리 현황 테이블 스타일 */
+      .report-file-page .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .report-file-page .log-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      .report-file-page .log-table thead {
+        background: #f5f7fd;
+      }
+
+      .report-file-page .log-table th,
+      .report-file-page .log-table td {
+        white-space: nowrap;
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+
+      .report-file-page .log-table th {
+        font-weight: 700;
+        color: #1b2340;
+        border-bottom: 1px solid #dde3f5;
+        text-align: left;
+      }
+
+      .report-file-page .log-table td {
+        border-bottom: 1px solid #f0f2fa;
+        color: #303547;
+      }
+
+      .report-file-page .log-table tbody tr:nth-child(even) td {
+        background: #fafbff;
+      }
+
+      .report-file-page .log-table tbody tr:hover td {
+        background: #eef3ff;
+      }
+
+      @media (max-width: 1100px) {
+        .report-file-page .report-content {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .report-file-page .report-row {
+          flex-direction: column;
+        }
+      }
+    </style>
   </head>
 
-  <body class="sentinel-body">
+  <body class="sentinel-body report-file-page">
     <!-- 상단 네비게이션 바 -->
     <header class="top-nav">
       <div class="top-nav-left">

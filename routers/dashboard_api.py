@@ -5,7 +5,7 @@ import json
 import re
 import ipaddress
 from typing import Dict, List, Any
-from collections import defaultdict
+from collections import defaultdict, Counter
 from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -15,8 +15,9 @@ from sqlalchemy import cast, Text, func  # JSON 검색 + interface 필터용
 from db import SessionLocal, Base, engine
 from models import LogRecord, McpConfigEntry
 from config import settings
-
-router = APIRouter()  # 접두는 app.py에서 prefix="/api"로 부여
+  
+# 접두는 app.py에서 prefix="/api"로 부여
+router = APIRouter()
 
 # https://123.45.67.89/ 이런 형태의 URL 탐지용 정규표현식
 IP_URL_RE = re.compile(
@@ -26,6 +27,26 @@ IP_URL_RE = re.compile(
 
 # 운영에서는 Alembic 권장. 개발 편의를 위해 안전 생성.
 Base.metadata.create_all(bind=engine)
+
+def _parse_attachment(att) -> dict:
+    """
+    log_records.attachment 컬럼을 Python dict로 통일해서 리턴.
+    - DB에는 TEXT(JSON 문자열)로 들어가 있을 수도 있고
+    - SQLAlchemy에서 이미 dict로 올라올 수도 있으니 둘 다 처리.
+    """
+    if not att:
+        return {}
+
+    if isinstance(att, dict):
+        return att or {}
+
+    if isinstance(att, str):
+        try:
+            return json.loads(att)
+        except Exception:
+            return {}
+
+    return {}
 
 # --- DB 세션 DI ---
 def get_db():
@@ -763,9 +784,8 @@ def network_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
         "suspicious_logs": suspicious_logs,
     }
 
-@router.get("/report/llm/file-summary")
+@router.get("/report/llm/file-summary", dependencies=[Depends(require_admin)])
 def report_llm_file_summary(
-    admin_key: str | None = Header(None, alias="X-Admin-Key"),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
@@ -781,7 +801,7 @@ def report_llm_file_summary(
     q = (
         db.query(LogRecord)
         .filter(
-            LogRecord.interface == "llm",
+            func.lower(LogRecord.interface) == "llm",
             LogRecord.attachment.isnot(None),  # SQLite: IS NOT NULL
         )
         .order_by(LogRecord.created_at.desc())
@@ -799,8 +819,8 @@ def report_llm_file_summary(
     recent: List[Dict[str, Any]] = []
 
     for r in rows:
-        att = r.attachment or {}
-        ext = (att.get("format") or "unknown").lower()
+        att = _parse_attachment(r.attachment)
+        ext = (att.get("format") or "unknown").strip().lower()
         donut_counts[ext] += 1
 
         # 엔티티 라벨 집계
@@ -811,15 +831,17 @@ def report_llm_file_summary(
         if len(recent) < 20:
             recent.append(
                 {
-                    "time": r.time,
+                    "time": r.created_at.isoformat() if r.created_at else getattr(r, "time", None),
                     "host": r.host,
-                    "pc_name": r.hostname,   # PC 이름을 hostname 필드에 넣고 있을 것
+                    "pc_name": r.hostname,
                     "public_ip": r.public_ip,
                     "private_ip": r.private_ip,
                     "action": r.action,
                     "has_sensitive": r.has_sensitive,
                     "file_blocked": r.file_blocked,
                     "file_ext": ext,
+                    # 파일 메타 전체도 같이 내려주면 프론트에서 추가로 활용 가능
+                    "attachment": att,
                 }
             )
 

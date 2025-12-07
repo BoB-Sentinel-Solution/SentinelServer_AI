@@ -37,15 +37,22 @@ def _parse_attachment(att) -> dict:
     if not att:
         return {}
 
+    # 이미 dict인 경우 (SQLAlchemy JSON 타입 등)
     if isinstance(att, dict):
         return att or {}
 
+    # 문자열인 경우: JSON 디코드 후 dict일 때만 사용
     if isinstance(att, str):
         try:
-            return json.loads(att)
+            obj = json.loads(att)
+            if isinstance(obj, dict):
+                return obj
+            else:
+                return {}
         except Exception:
             return {}
 
+    # 그 외 타입은 전부 무시
     return {}
 
 # --- DB 세션 DI ---
@@ -789,20 +796,20 @@ def report_llm_file_summary(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
-    LLM 인터페이스 중 파일(attachment) 이 있는 로그만 대상으로
+    LLM 인터페이스 중 파일(attachment)이 있는 로그만 대상으로
     - 확장자별 개수 (도넛 차트용)
     - 확장자 x 라벨별 개수 (스택 바용)
     - 최근 20건 테이블
     을 반환
     """
-    _require_admin(admin_key)
 
-    # 1) 파일 첨부된 LLM 로그만 조회
+    # 1) 파일 첨부된 LLM 로그만 조회 (interface 대소문자 무시 + attachment 비어있지 않은 것만)
     q = (
         db.query(LogRecord)
         .filter(
             func.lower(LogRecord.interface) == "llm",
-            LogRecord.attachment.isnot(None),  # SQLite: IS NOT NULL
+            LogRecord.attachment.isnot(None),
+            LogRecord.attachment != "",
         )
         .order_by(LogRecord.created_at.desc())
     )
@@ -819,8 +826,10 @@ def report_llm_file_summary(
     recent: List[Dict[str, Any]] = []
 
     for r in rows:
+        # attachment 컬럼을 항상 dict 로 정규화
         att = _parse_attachment(r.attachment)
-        ext = (att.get("format") or "unknown").strip().lower()
+        ext = (att.get("format") or "unknown").lower()
+
         donut_counts[ext] += 1
 
         # 엔티티 라벨 집계
@@ -833,15 +842,13 @@ def report_llm_file_summary(
                 {
                     "time": r.created_at.isoformat() if r.created_at else getattr(r, "time", None),
                     "host": r.host,
-                    "pc_name": r.hostname,
+                    "pc_name": r.hostname,   # PC 이름
                     "public_ip": r.public_ip,
                     "private_ip": r.private_ip,
                     "action": r.action,
                     "has_sensitive": r.has_sensitive,
                     "file_blocked": r.file_blocked,
                     "file_ext": ext,
-                    # 파일 메타 전체도 같이 내려주면 프론트에서 추가로 활용 가능
-                    "attachment": att,
                 }
             )
 

@@ -114,13 +114,13 @@
       /* 처리 현황 테이블 스타일 */
       .report-file-page .table-wrapper {
         width: 100%;
-        overflow-x: auto;
+        overflow-x: auto; /* 가로 스크롤 */
       }
 
       .report-file-page .log-table {
         width: 100%;
+        min-width: 980px;          /* 이 이상은 유지하고, 좁으면 스크롤 */
         border-collapse: collapse;
-        table-layout: fixed;
       }
 
       .report-file-page .log-table thead {

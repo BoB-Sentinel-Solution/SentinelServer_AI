@@ -76,6 +76,40 @@
         font-size: 11px;
       }
 
+      /* -------- 상위 3개 대역 카드 스타일 -------- */
+      .network-bands-cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .network-band-card {
+        border-radius: 14px;
+        background: #f5f7fd;
+        border: 1px solid #dde3f5;
+        padding: 10px 14px;
+        box-shadow: 0 1px 3px rgba(20, 40, 80, 0.05);
+      }
+
+      .network-band-card-title {
+        font-weight: 700;
+        font-size: 13px;
+        color: #1b2340;
+        margin-bottom: 6px;
+      }
+
+      .network-band-card-body {
+        font-size: 12px;
+        line-height: 1.5;
+        color: #2f3345;
+        white-space: pre-line;
+      }
+
+      /* 데이터 없을 때 한 줄만 가운데 띄우기 */
+      .network-bands-cards .empty-hint {
+        grid-column: 1 / -1;
+      }
+
       /* 의심 PC 리스트 스타일 */
       .bullet-list {
         margin: 0 0 8px;
@@ -94,15 +128,45 @@
         color: #8b90a5;
       }
 
-      /* 테이블 래퍼: 가로 스크롤 */
+      /* -------- 테이블 스타일 강화 -------- */
       .table-wrapper {
         width: 100%;
         overflow-x: auto;
       }
 
+      .network-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .network-table thead {
+        background: #f5f7fd;
+      }
+
       .network-table th,
       .network-table td {
         white-space: nowrap;
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+
+      .network-table th {
+        font-weight: 700;
+        color: #1b2340;
+        border-bottom: 1px solid #dde3f5;
+      }
+
+      .network-table td {
+        border-bottom: 1px solid #f0f2fa;
+        color: #303547;
+      }
+
+      .network-table tbody tr:nth-child(even) td {
+        background: #fafbff;
+      }
+
+      .network-table tbody tr:hover td {
+        background: #eef3ff;
       }
 
       /* 반응형: 폭이 좁을 때는 세로로 쌓기 */
@@ -117,6 +181,9 @@
         .network-top-body {
           flex-direction: column;
           align-items: flex-start;
+        }
+        .network-bands-cards {
+          grid-template-columns: repeat(1, minmax(0, 1fr));
         }
       }
     </style>
@@ -257,7 +324,7 @@
                 </thead>
                 <tbody id="network-table-body">
                   <tr>
-                    <td colspan="11">데이터를 불러오는 중입니다...</td>
+                    <td colspan="11">외부 IP 사용 의심 PC 로그가 없습니다.</td>
                   </tr>
                 </tbody>
               </table>

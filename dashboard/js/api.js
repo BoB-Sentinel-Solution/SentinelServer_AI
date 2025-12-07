@@ -71,6 +71,14 @@
   }
 
   // -------------------------
+  // /report/llm/file-summary 전용 헬퍼
+  //   - 사용 예: fetchLlmFileSummary()
+  // -------------------------
+  function fetchLlmFileSummary() {
+    return apiGet("/report/llm/file-summary");
+  }
+
+  // -------------------------
   // /logs 전용 헬퍼
   //   - 사용 예: fetchLogs({ page: 1, page_size: 20, q: "chatgpt.com", category: "host" })
   // -------------------------
@@ -83,10 +91,11 @@
   const api = {
     getAdminKey,
     setAdminKey,
-    // 기존 코드 호환용: 직접 path+쿼리 문자열을 넣는 형태도 그대로 지원
+    // 공통 GET
     get: apiGet,
-    // 새로 추가된 편의 함수들
+    // 편의 함수들
     fetchSummary,
+    fetchLlmFileSummary,
     fetchLogs,
   };
 

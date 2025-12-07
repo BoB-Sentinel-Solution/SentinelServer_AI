@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
 /** 상단 UPDATED 시계 */
 function initTopBarClock() {
   const el = document.getElementById("top-updated-at");
+  if (!el) return;
+
   function tick() {
     const now = new Date();
     const hh = String(now.getHours()).padStart(2, "0");
@@ -32,34 +34,38 @@ function hookRefreshButton() {
   });
 }
 
-/** /api/summary?interface=LLM 호출해서 FILE BASED 통계 로딩 */
+/**
+ * 파일 기반 리포트 로딩
+ * /api/report/llm/file-summary 호출
+ */
 async function loadFileBasedReport() {
   try {
-    const data = await fetchSummary({ interface: "LLM" });
-    renderFileDonut(data);
-    renderFileStack(data);
-    renderFileTable(data);
+    // api.js에 추가한 fetchLlmFileSummary() 사용
+    const summary = await fetchLlmFileSummary();
+
+    renderFileDonut(summary?.donut);
+    renderFileStack(summary?.stacked);
+    renderFileTable(summary?.recent);
   } catch (err) {
     console.error("파일 기반 리포트 로딩 실패:", err);
   }
 }
 
-/** 도넛: 파일 확장자별 탐지 건수 (file_detect_by_ext) */
-function renderFileDonut(data) {
+/** 도넛: 파일 확장자별 탐지 건수 */
+function renderFileDonut(donut) {
   const canvas = document.getElementById("chart-file-ext-donut");
   const emptyMsg = document.getElementById("file-donut-empty");
   if (!canvas) return;
-
-  const stat = (data && data.file_detect_by_ext) || {};
-  const exts = Object.keys(stat).sort();
-  const values = exts.map((ext) => stat[ext] || 0);
 
   if (fileExtDonutChart) {
     fileExtDonutChart.destroy();
     fileExtDonutChart = null;
   }
 
-  if (!exts.length) {
+  const labels = (donut?.labels || []).map((x) => String(x).toUpperCase());
+  const values = donut?.data || [];
+
+  if (!labels.length || !values.length) {
     canvas.style.display = "none";
     if (emptyMsg) emptyMsg.style.display = "block";
     return;
@@ -68,11 +74,13 @@ function renderFileDonut(data) {
   canvas.style.display = "block";
   if (emptyMsg) emptyMsg.style.display = "none";
 
+  const total = values.reduce((a, b) => a + b, 0) || 1;
+
   const ctx = canvas.getContext("2d");
   fileExtDonutChart = new Chart(ctx, {
     type: "doughnut",
     data: {
-      labels: exts.map((e) => e.toUpperCase()),
+      labels,
       datasets: [
         {
           label: "탐지 건수",
@@ -93,7 +101,8 @@ function renderFileDonut(data) {
             label: function (ctx) {
               const label = ctx.label || "";
               const value = ctx.parsed || 0;
-              return `${label}: ${value}건`;
+              const pct = ((value / total) * 100).toFixed(1);
+              return `${label}: ${value}건 (${pct}%)`;
             },
           },
         },
@@ -103,29 +112,22 @@ function renderFileDonut(data) {
   });
 }
 
-/** 가로 스택바: 확장자 × 라벨 (file_label_by_ext) */
-function renderFileStack(data) {
+/** 가로 스택바: 확장자 × 라벨 */
+function renderFileStack(stacked) {
   const canvas = document.getElementById("chart-file-ext-labels");
   const emptyMsg = document.getElementById("file-stack-empty");
   if (!canvas) return;
-
-  const stat = (data && data.file_label_by_ext) || {};
-  const exts = Object.keys(stat).sort();
-
-  // 전체 라벨 목록 수집
-  const labelSet = new Set();
-  exts.forEach((ext) => {
-    const byLabel = stat[ext] || {};
-    Object.keys(byLabel).forEach((lbl) => labelSet.add(lbl));
-  });
-  const labels = Array.from(labelSet).sort();
 
   if (fileExtStackChart) {
     fileExtStackChart.destroy();
     fileExtStackChart = null;
   }
 
-  if (!exts.length || !labels.length) {
+  const formats = stacked?.formats || [];
+  const entityLabels = stacked?.labels || [];
+  const matrix = stacked?.matrix || [];
+
+  if (!formats.length || !entityLabels.length || !matrix.length) {
     canvas.style.display = "none";
     if (emptyMsg) emptyMsg.style.display = "block";
     return;
@@ -134,13 +136,11 @@ function renderFileStack(data) {
   canvas.style.display = "block";
   if (emptyMsg) emptyMsg.style.display = "none";
 
-  const datasets = labels.map((lbl) => {
+  // datasets: 각 엔티티 라벨별로 한 줄
+  const datasets = entityLabels.map((lab, labIdx) => {
     return {
-      label: lbl,
-      data: exts.map((ext) => {
-        const byLabel = stat[ext] || {};
-        return byLabel[lbl] || 0;
-      }),
+      label: lab,
+      data: formats.map((_, fmtIdx) => matrix[fmtIdx]?.[labIdx] || 0),
       stack: "file-labels",
     };
   });
@@ -149,7 +149,7 @@ function renderFileStack(data) {
   fileExtStackChart = new Chart(ctx, {
     type: "bar",
     data: {
-      labels: exts.map((e) => e.toUpperCase()),
+      labels: formats.map((f) => String(f).toUpperCase()),
       datasets,
     },
     options: {
@@ -186,33 +186,33 @@ function renderFileStack(data) {
   });
 }
 
-/** 테이블: recent_file_logs */
-function renderFileTable(data) {
+/** 테이블: 최근 파일 첨부 로그 */
+function renderFileTable(recent) {
   const tbody = document.getElementById("file-log-tbody");
   const emptyMsg = document.getElementById("file-table-empty");
   if (!tbody) return;
 
   tbody.innerHTML = "";
 
-  const logs = (data && data.recent_file_logs) || [];
+  const rows = Array.isArray(recent) ? recent : [];
 
-  if (!logs.length) {
+  if (!rows.length) {
     if (emptyMsg) emptyMsg.style.display = "block";
     return;
   }
   if (emptyMsg) emptyMsg.style.display = "none";
 
-  logs.forEach((row) => {
+  rows.forEach((row) => {
     const tr = document.createElement("tr");
 
     const time = formatTime(row.time);
     const host = row.host || "";
-    const pcName = row.hostname || "";
+    const pcName = row.pc_name || row.hostname || "";
     const pubIp = row.public_ip || "";
     const privIp = row.private_ip || "";
     const action = row.action || "";
     const sensitive = row.has_sensitive ? "Y" : "N";
-    const fileBlocked = row.file_blocked || row.blocked ? "Y" : "N";
+    const fileBlocked = row.file_blocked ? "Y" : "N";
 
     tr.appendChild(td(time));
     tr.appendChild(td(host));

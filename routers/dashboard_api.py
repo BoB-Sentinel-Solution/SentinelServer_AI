@@ -762,3 +762,89 @@ def network_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
         # 외부 IP 사용 의심 PC 로그 테이블
         "suspicious_logs": suspicious_logs,
     }
+
+@router.get("/report/llm/file-summary")
+def report_llm_file_summary(
+    admin_key: str | None = Header(None, alias=settings.admin_header),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    LLM 인터페이스 중 파일(attachment) 이 있는 로그만 대상으로
+    - 확장자별 개수 (도넛 차트용)
+    - 확장자 x 라벨별 개수 (스택 바용)
+    - 최근 20건 테이블
+    을 반환
+    """
+    _require_admin(admin_key)
+
+    # 1) 파일 첨부된 LLM 로그만 조회
+    q = (
+        db.query(LogRecord)
+        .filter(
+            LogRecord.interface == "llm",
+            LogRecord.attachment.isnot(None),  # SQLite: IS NOT NULL
+        )
+        .order_by(LogRecord.created_at.desc())
+    )
+
+    rows: List[LogRecord] = q.limit(200).all()
+
+    # 2) 도넛: 확장자별 개수
+    donut_counts: Dict[str, int] = defaultdict(int)
+
+    # 3) 스택 바: 확장자 x 라벨
+    stacked_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
+    # 4) 테이블: 최근 20건
+    recent: List[Dict[str, Any]] = []
+
+    for r in rows:
+        att = r.attachment or {}
+        ext = (att.get("format") or "unknown").lower()
+        donut_counts[ext] += 1
+
+        # 엔티티 라벨 집계
+        for e in (r.entities or []):
+            lab = (e.get("label") or "OTHER").upper()
+            stacked_counts[ext][lab] += 1
+
+        if len(recent) < 20:
+            recent.append(
+                {
+                    "time": r.time,
+                    "host": r.host,
+                    "pc_name": r.hostname,   # PC 이름을 hostname 필드에 넣고 있을 것
+                    "public_ip": r.public_ip,
+                    "private_ip": r.private_ip,
+                    "action": r.action,
+                    "has_sensitive": r.has_sensitive,
+                    "file_blocked": r.file_blocked,
+                    "file_ext": ext,
+                }
+            )
+
+    # 차트용 구조 정리
+    ext_labels = sorted(donut_counts.keys())
+    donut_data = [donut_counts[e] for e in ext_labels]
+
+    all_entity_labels = sorted(
+        {lab for ext in stacked_counts.values() for lab in ext.keys()}
+    )
+
+    matrix: List[List[int]] = []
+    for ext in ext_labels:
+        row = [stacked_counts[ext].get(lab, 0) for lab in all_entity_labels]
+        matrix.append(row)
+
+    return {
+        "donut": {
+            "labels": ext_labels,
+            "data": donut_data,
+        },
+        "stacked": {
+            "formats": ext_labels,
+            "labels": all_entity_labels,
+            "matrix": matrix,
+        },
+        "recent": recent,
+    }

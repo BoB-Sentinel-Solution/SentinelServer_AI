@@ -99,8 +99,14 @@
     fetchLogs,
   };
 
-  // 우리가 주로 쓸 이름
+  // 우리가 주로 쓸 이름 (객체 형태)
   global.SentinelApi = api;
   // 혹시 다른 파일에서 SentinelAPI 로 잘못 쓴 경우도 대응
   global.SentinelAPI = api;
+
+  // ---- 기존 코드 호환용: 개별 함수도 전역으로 직접 노출 ----
+  // report_llm_file.js 등에서 그냥 fetchLlmFileSummary()로 호출하는 경우 지원
+  global.fetchSummary = fetchSummary;
+  global.fetchLlmFileSummary = fetchLlmFileSummary;
+  global.fetchLogs = fetchLogs;
 })(window);

@@ -7,6 +7,119 @@
 
     <link rel="stylesheet" href="./vendor/reset.min.css" />
     <link rel="stylesheet" href="./css/styles.css" />
+
+    <!-- Network 페이지 전용 스타일 -->
+    <style>
+      /* 메인 레이아웃: 상단 네비 아래 여백 + 중앙 정렬 */
+      .network-layout {
+        max-width: 1440px;
+        margin: 32px auto 40px;
+        padding: 0 24px;
+      }
+
+      /* 행(가로 2카드) 레이아웃 */
+      .network-row {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      /* 카드 공통: report-card 스타일을 그대로 사용하되, flex로 너비 조절 */
+      .network-card {
+        flex: 1 1 0;
+      }
+
+      /* 첫 번째 행 카드 비율 (왼쪽: 오른쪽보다 약간 좁게) */
+      .network-row--top .network-card--left {
+        flex: 0.95;
+      }
+      .network-row--top .network-card--right {
+        flex: 1.05;
+      }
+
+      /* 카드 안쪽 약간만 조정 */
+      .network-top-body {
+        display: flex;
+        align-items: center;
+        gap: 32px;
+      }
+
+      .network-chart-area {
+        flex: 1 1 auto;
+      }
+
+      /* 숫자 pill */
+      .pill-large {
+        min-width: 140px;
+        padding: 12px 16px;
+        border-radius: 14px;
+        background: #f5f7fd;
+        border: 1px solid #dde3f5;
+        text-align: left;
+      }
+
+      .pill-large-main {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1b2340;
+        line-height: 1.1;
+      }
+
+      .pill-large-label {
+        font-size: 12px;
+        margin-top: 4px;
+        color: #7a8094;
+      }
+
+      /* 네트워크용 카드 상단/설명 */
+      .card-subtitle {
+        font-size: 11px;
+      }
+
+      /* 의심 PC 리스트 스타일 */
+      .bullet-list {
+        margin: 0 0 8px;
+        padding-left: 18px;
+        font-size: 13px;
+        color: #2f3345;
+      }
+
+      .bullet-list li + li {
+        margin-top: 4px;
+      }
+
+      .empty-hint {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #8b90a5;
+      }
+
+      /* 테이블 래퍼: 가로 스크롤 */
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .network-table th,
+      .network-table td {
+        white-space: nowrap;
+      }
+
+      /* 반응형: 폭이 좁을 때는 세로로 쌓기 */
+      @media (max-width: 1100px) {
+        .network-row {
+          flex-direction: column;
+        }
+        .network-row--top .network-card--left,
+        .network-row--top .network-card--right {
+          flex: 1 1 auto;
+        }
+        .network-top-body {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+    </style>
   </head>
 
   <body class="sentinel-body">
@@ -40,145 +153,117 @@
       </div>
     </header>
 
-    <!-- 상단 안내 바 -->
-    <section class="banner-info">
-      If you want to view the latest logs, click the refresh button.
-    </section>
+    <!-- 메인 컨텐츠 -->
+    <main class="network-layout">
+      <!-- 1행: PUBLIC 대역 개수 + 대역폭 별 연결 사설망 -->
+      <section class="network-row network-row--top">
+        <!-- PUBLIC 대역 개수 + 파이차트 -->
+        <article class="card report-card network-card network-card--left">
+          <header class="card-header">
+            <h3 class="card-title">PUBLIC 대역 개수</h3>
+            <span class="card-subtitle">
+              공인 IP가 탐지된 /16 대역 수 및 사용 현황
+            </span>
+          </header>
+          <div class="card-body network-top-body">
+            <div class="pill-large">
+              <div id="public-band-count" class="pill-large-main">--</div>
+              <div class="pill-large-label">PUBLIC 대역 개수</div>
+            </div>
 
-    <!-- 메인 레이아웃 -->
-    <main class="report-layout">
-      <section class="report-main">
-        <!-- 좌측 사이드 메뉴 (리포트 스타일 공통 사용) -->
-        <aside class="report-sidebar">
-          <div class="report-sidebar-inner">
-            <div class="side-group">
-              <div class="side-group-title">| NETWORK</div>
-              <div class="side-link side-link--active">
-                외부 IP 사용 현황
-              </div>
-              <div class="side-link">
-                공인 IP 대역 / 사설망 분석
-              </div>
-              <div class="side-link">
-                외부 IP 사용 의심 PC 로그
-              </div>
+            <div class="network-chart-area">
+              <h4 class="card-subtitle">대역폭 사용 현황</h4>
+              <canvas id="chart-public-bands" height="200"></canvas>
+              <p
+                id="public-bands-empty"
+                class="empty-hint"
+                style="display: none"
+              >
+                공인 IP 대역 사용 로그가 없습니다.
+              </p>
             </div>
           </div>
-        </aside>
+        </article>
 
-        <!-- 우측 본문 카드들 -->
-        <section class="report-main-content">
-          <!-- 1행: PUBLIC 대역 개수 + 대역폭 별 연결 사설망 -->
-          <div class="report-row report-row--top">
-            <!-- PUBLIC 대역 개수 + 파이차트 -->
-            <article class="card report-card report-card--half">
-              <header class="card-header">
-                <h3 class="card-title">PUBLIC 대역 개수</h3>
-                <span class="card-subtitle">
-                  공인 IP가 탐지된 /16 대역 수 및 사용 현황
-                </span>
-              </header>
-              <div class="card-body network-top-body">
-                <div class="pill-large">
-                  <div id="public-band-count" class="pill-large-main">--</div>
-                  <div class="pill-large-label">PUBLIC 대역 개수</div>
-                </div>
-
-                <div class="network-chart-area">
-                  <h4 class="card-subtitle">대역폭 사용 현황</h4>
-                  <canvas id="chart-public-bands" height="200"></canvas>
-                  <p
-                    id="public-bands-empty"
-                    class="empty-hint"
-                    style="display: none"
-                  >
-                    공인 IP 대역 사용 로그가 없습니다.
-                  </p>
-                </div>
-              </div>
-            </article>
-
-            <!-- 대역폭 별 연결 사설망 (상위 3개) -->
-            <article class="card report-card report-card--half">
-              <header class="card-header">
-                <h3 class="card-title">
-                  대역폭 별 연결 사설망 (대역폭 사용 개수 상위 3개)
-                </h3>
-                <span class="card-subtitle">
-                  공인 IP /16 대역 기준으로 연결된 사설망과 중요정보 탐지 로그
-                </span>
-              </header>
-              <div class="card-body">
-                <div id="top-private-bands" class="network-bands-cards">
-                  <p class="empty-hint">
-                    데이터를 불러오는 중입니다...
-                  </p>
-                </div>
-              </div>
-            </article>
+        <!-- 대역폭 별 연결 사설망 (상위 3개) -->
+        <article class="card report-card network-card network-card--right">
+          <header class="card-header">
+            <h3 class="card-title">
+              대역폭 별 연결 사설망 (대역폭 사용 개수 상위 3개)
+            </h3>
+            <span class="card-subtitle">
+              공인 IP /16 대역 기준으로 연결된 사설망과 중요정보 탐지 로그
+            </span>
+          </header>
+          <div class="card-body">
+            <div id="top-private-bands" class="network-bands-cards">
+              <p class="empty-hint">
+                데이터를 불러오는 중입니다...
+              </p>
+            </div>
           </div>
+        </article>
+      </section>
 
-          <!-- 2행: 외부 IP 사용 의심 PC 정보 + 로그 테이블 -->
-          <div class="report-row">
-            <!-- 외부 IP 사용 의심 PC 정보 -->
-            <article class="card report-card report-card--half">
-              <header class="card-header">
-                <h3 class="card-title">외부 IP 사용 의심 PC 정보</h3>
-                <span class="card-subtitle">
-                  PUBLIC IP / PRIVATE IP / PC NAME 조합으로 직접 노출 및 신규
-                  출구 탐지
-                </span>
-              </header>
-              <div class="card-body">
-                <ul id="suspicious-pc-list" class="bullet-list">
-                  <li>데이터를 불러오는 중입니다...</li>
-                </ul>
-                <p class="empty-hint">
-                  • <strong>(PUBLIC IP) / (PRIVATE IP) / (PC NAME)</strong> 형식으로
-                  표시됩니다.<br />
-                  • 직접 노출: PUBLIC IP와 PRIVATE IP가 동일한 경우<br />
-                  • 신규 출구: PRIVATE IP가 사설망이 아닌 경우
-                </p>
-              </div>
-            </article>
-
-            <!-- 외부 IP 사용 의심 PC 로그 테이블 -->
-            <article class="card report-card report-card--half">
-              <header class="card-header">
-                <h3 class="card-title">외부 IP 사용 의심 PC 로그</h3>
-                <span class="card-subtitle">
-                  의심 PC에서 발생한 LLM/MCP 요청 이력 (최신 50건)
-                </span>
-              </header>
-              <div class="card-body">
-                <div class="table-wrapper">
-                  <table class="table network-table">
-                    <thead>
-                      <tr>
-                        <th>Prompt</th>
-                        <th>Time</th>
-                        <th>Host</th>
-                        <th>PC Name</th>
-                        <th>Public IP</th>
-                        <th>Private IP</th>
-                        <th>Interface</th>
-                        <th>Action</th>
-                        <th>Sensitivity</th>
-                        <th>Block files</th>
-                        <th>Entity</th>
-                      </tr>
-                    </thead>
-                    <tbody id="network-table-body">
-                      <tr>
-                        <td colspan="11">데이터를 불러오는 중입니다...</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </article>
+      <!-- 2행: 외부 IP 사용 의심 PC 정보 + 로그 테이블 -->
+      <section class="network-row">
+        <!-- 외부 IP 사용 의심 PC 정보 -->
+        <article class="card report-card network-card">
+          <header class="card-header">
+            <h3 class="card-title">외부 IP 사용 의심 PC 정보</h3>
+            <span class="card-subtitle">
+              PUBLIC IP / PRIVATE IP / PC NAME 조합으로 직접 노출 및 신규
+              출구 탐지
+            </span>
+          </header>
+          <div class="card-body">
+            <ul id="suspicious-pc-list" class="bullet-list">
+              <li>데이터를 불러오는 중입니다...</li>
+            </ul>
+            <p class="empty-hint">
+              • <strong>(PUBLIC IP) / (PRIVATE IP) / (PC NAME)</strong> 형식으로
+              표시됩니다.<br />
+              • 직접 노출: PUBLIC IP와 PRIVATE IP가 동일한 경우<br />
+              • 신규 출구: PRIVATE IP가 사설망이 아닌 경우
+            </p>
           </div>
-        </section>
+        </article>
+
+        <!-- 외부 IP 사용 의심 PC 로그 테이블 -->
+        <article class="card report-card network-card">
+          <header class="card-header">
+            <h3 class="card-title">외부 IP 사용 의심 PC 로그</h3>
+            <span class="card-subtitle">
+              의심 PC에서 발생한 LLM/MCP 요청 이력 (최신 50건)
+            </span>
+          </header>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table class="table network-table">
+                <thead>
+                  <tr>
+                    <th>Prompt</th>
+                    <th>Time</th>
+                    <th>Host</th>
+                    <th>PC Name</th>
+                    <th>Public IP</th>
+                    <th>Private IP</th>
+                    <th>Interface</th>
+                    <th>Action</th>
+                    <th>Sensitivity</th>
+                    <th>Block files</th>
+                    <th>Entity</th>
+                  </tr>
+                </thead>
+                <tbody id="network-table-body">
+                  <tr>
+                    <td colspan="11">데이터를 불러오는 중입니다...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </article>
       </section>
     </main>
 

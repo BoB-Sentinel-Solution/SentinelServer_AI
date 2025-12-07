@@ -765,7 +765,7 @@ def network_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
 @router.get("/report/llm/file-summary")
 def report_llm_file_summary(
-    admin_key: str | None = Header(None, alias=settings.admin_header),
+    admin_key: str | None = Header(None, alias="X-Admin-Key"),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """

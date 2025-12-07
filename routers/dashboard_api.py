@@ -803,14 +803,11 @@ def report_llm_file_summary(
     을 반환
     """
 
-    # 1) 파일 첨부된 LLM 로그만 조회 (interface 대소문자 무시 + attachment 비어있지 않은 것만)
+    # 1) 파일 첨부된 LLM 로그만 조회 (interface 소문자 기준으로 필터)
     q = (
         db.query(LogRecord)
-        .filter(
-            func.lower(LogRecord.interface) == "llm",
-            LogRecord.attachment.isnot(None),
-            LogRecord.attachment != "",
-        )
+        .filter(func.lower(LogRecord.interface) == "llm")
+        .filter(LogRecord.attachment.isnot(None))  # SQLite: IS NOT NULL
         .order_by(LogRecord.created_at.desc())
     )
 
@@ -826,10 +823,11 @@ def report_llm_file_summary(
     recent: List[Dict[str, Any]] = []
 
     for r in rows:
-        # attachment 컬럼을 항상 dict 로 정규화
+        # --- attachment 파싱 (TEXT/JSON → dict 통일) ---
         att = _parse_attachment(r.attachment)
-        ext = (att.get("format") or "unknown").lower()
+        ext = (att.get("format") or "unknown").strip().lower()
 
+        # 도넛 카운트
         donut_counts[ext] += 1
 
         # 엔티티 라벨 집계
@@ -837,6 +835,7 @@ def report_llm_file_summary(
             lab = (e.get("label") or "OTHER").upper()
             stacked_counts[ext][lab] += 1
 
+        # 최근 20건 테이블
         if len(recent) < 20:
             recent.append(
                 {
@@ -857,7 +856,7 @@ def report_llm_file_summary(
     donut_data = [donut_counts[e] for e in ext_labels]
 
     all_entity_labels = sorted(
-        {lab for ext in stacked_counts.values() for lab in ext.keys()}
+        {lab for ext_map in stacked_counts.values() for lab in ext_map.keys()}
     )
 
     matrix: List[List[int]] = []
@@ -877,3 +876,4 @@ def report_llm_file_summary(
         },
         "recent": recent,
     }
+

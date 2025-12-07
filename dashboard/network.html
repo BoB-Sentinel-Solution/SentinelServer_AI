@@ -22,13 +22,13 @@
           <a class="top-menu-item" href="./dashboard.html">DASHBOARD</a>
           <a class="top-menu-item" href="./report.html">REPORT</a>
           <a class="top-menu-item" href="./logs.html">LOGS</a>
-          <a class="top-menu-item" href="./settings.html">SETTINGS</a>
           <a class="top-menu-item" href="./reason.html">REASON</a>
           <a
             class="top-menu-item top-menu-item--active"
             href="./network.html"
             >NETWORK</a
           >
+          <a class="top-menu-item" href="./settings.html">SETTINGS</a>
         </nav>
       </div>
 
@@ -45,26 +45,29 @@
       If you want to view the latest logs, click the refresh button.
     </section>
 
+    <!-- 메인 레이아웃 -->
     <main class="report-layout">
-      <section class="report-content">
-        <!-- 좌측 사이드 메뉴 (간단 버전) -->
-        <aside class="report-side-nav">
-          <section class="side-section side-section--active">
-            <h3 class="side-section-title">NETWORK</h3>
-            <div class="side-menu-item side-menu-item--active">
-              외부 IP 사용 현황
+      <section class="report-main">
+        <!-- 좌측 사이드 메뉴 (리포트 스타일 공통 사용) -->
+        <aside class="report-sidebar">
+          <div class="report-sidebar-inner">
+            <div class="side-group">
+              <div class="side-group-title">| NETWORK</div>
+              <div class="side-link side-link--active">
+                외부 IP 사용 현황
+              </div>
+              <div class="side-link">
+                공인 IP 대역 / 사설망 분석
+              </div>
+              <div class="side-link">
+                외부 IP 사용 의심 PC 로그
+              </div>
             </div>
-            <div class="side-menu-item">
-              공인 IP 대역 / 사설망 분석
-            </div>
-            <div class="side-menu-item">
-              외부 IP 사용 의심 PC 로그
-            </div>
-          </section>
+          </div>
         </aside>
 
-        <!-- 메인 영역 -->
-        <section class="report-main">
+        <!-- 우측 본문 카드들 -->
+        <section class="report-main-content">
           <!-- 1행: PUBLIC 대역 개수 + 대역폭 별 연결 사설망 -->
           <div class="report-row report-row--top">
             <!-- PUBLIC 대역 개수 + 파이차트 -->

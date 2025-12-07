@@ -40,14 +40,20 @@ function hookRefreshButton() {
  */
 async function loadFileBasedReport() {
   try {
-    // api.js에 추가한 fetchLlmFileSummary() 사용
+    // api.js에 정의된 fetchLlmFileSummary() 사용
     const summary = await fetchLlmFileSummary();
+    console.log("[report_llm_file] summary:", summary);
 
     renderFileDonut(summary?.donut);
     renderFileStack(summary?.stacked);
     renderFileTable(summary?.recent);
   } catch (err) {
     console.error("파일 기반 리포트 로딩 실패:", err);
+    const errBox = document.getElementById("file-error-box");
+    if (errBox) {
+      errBox.textContent = "파일 리포트 데이터를 불러오는 중 오류가 발생했습니다.";
+      errBox.style.display = "block";
+    }
   }
 }
 
@@ -57,6 +63,7 @@ function renderFileDonut(donut) {
   const emptyMsg = document.getElementById("file-donut-empty");
   if (!canvas) return;
 
+  // 이전 차트 제거
   if (fileExtDonutChart) {
     fileExtDonutChart.destroy();
     fileExtDonutChart = null;
@@ -118,6 +125,7 @@ function renderFileStack(stacked) {
   const emptyMsg = document.getElementById("file-stack-empty");
   if (!canvas) return;
 
+  // 이전 차트 제거
   if (fileExtStackChart) {
     fileExtStackChart.destroy();
     fileExtStackChart = null;
@@ -205,11 +213,12 @@ function renderFileTable(recent) {
   rows.forEach((row) => {
     const tr = document.createElement("tr");
 
-    const time = formatTime(row.time);
+    const time = formatTime(row.time || row.created_at);
     const host = row.host || "";
     const pcName = row.pc_name || row.hostname || "";
     const pubIp = row.public_ip || "";
     const privIp = row.private_ip || "";
+    const fileExt = (row.file_ext || "").toUpperCase();
     const action = row.action || "";
     const sensitive = row.has_sensitive ? "Y" : "N";
     const fileBlocked = row.file_blocked ? "Y" : "N";
@@ -219,6 +228,7 @@ function renderFileTable(recent) {
     tr.appendChild(td(pcName));
     tr.appendChild(td(pubIp));
     tr.appendChild(td(privIp));
+    tr.appendChild(td(fileExt, "center"));
     tr.appendChild(td(action));
     tr.appendChild(td(sensitive, "center"));
     tr.appendChild(td(fileBlocked, "center"));

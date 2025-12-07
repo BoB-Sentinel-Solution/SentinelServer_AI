@@ -75,13 +75,55 @@
         color: var(--text-muted);
         margin-top: 8px;
       }
+
+      /* ===== 타임라인 테이블 스타일 ===== */
       .table-wrapper {
         max-height: 260px;
         overflow: auto;
       }
+
+      .mcp-config-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
       .mcp-config-table th,
       .mcp-config-table td {
         white-space: nowrap;
+        font-size: 11px;         /* 살짝 더 작게 */
+        padding: 6px 8px;        /* 높이도 약간 줄임 */
+      }
+
+      .mcp-config-table thead {
+        background: #f5f7fd;
+      }
+
+      .mcp-config-table th {
+        font-weight: 700;
+        color: #1b2340;
+        border-bottom: 1px solid #dde3f5;
+        border-right: 1px solid #edf0fb;
+        text-align: left;
+      }
+
+      .mcp-config-table td {
+        color: #303547;
+        border-bottom: 1px solid #f1f3fb;
+        border-right: 1px solid #f5f7fd;
+      }
+
+      .mcp-config-table th:last-child,
+      .mcp-config-table td:last-child {
+        border-right: none;
+      }
+
+      .mcp-config-table tbody tr:nth-child(even) {
+        background: #fafbff;
+      }
+
+      .mcp-config-table tbody tr:hover {
+        background: #eef3ff;
       }
     </style>
   </head>
@@ -116,70 +158,71 @@
       </div>
     </header>
 
-  <main class="report-layout">
-  <!-- LLM / MCP 탭 -->
-  <section class="report-tabs-row">
-    <div class="report-tabs">
-      <a class="report-tab" href="./report.html">LLM</a>
-      <a
-        class="report-tab report-tab--active"
-        href="./report_mcp_info.html"
-        >MCP</a
-      >
-    </div>
-  </section>
-
-  <!-- 메인 2컬럼 레이아웃 (좌: 사이드바 / 우: 콘텐츠) -->
-  <section class="report-main">
-    <!-- 좌측 사이드바 -->
-    <aside class="report-sidebar">
-      <div class="report-sidebar-inner">
-        <!-- OVERALL -->
-        <div class="side-group">
-          <div class="side-group-title">| OVERALL</div>
-          <a class="side-link" href="./report_mcp_info.html">
-            MCP 서버 사용 순위
-          </a>
-          <a class="side-link" href="./report_mcp_info.html">
-            MCP 사용량
-          </a>
-        </div>
-
-        <!-- INFORMATION BASED -->
-        <div class="side-group">
-          <div class="side-group-title">| INFORMATION BASED</div>
-          <a class="side-link" href="./report_mcp_information.html">
-            중요정보 탐지
-          </a>
-          <a class="side-link" href="./report_mcp_information.html">
-            서비스별 중요 정보 탐지
-          </a>
-          <a class="side-link" href="./report_mcp_information.html">
-            MCP 사용량 추이
-          </a>
-        </div>
-
-        <!-- CONFIG (현재 페이지) -->
-        <div class="side-group">
-          <div class="side-group-title">| CONFIG</div>
+    <main class="report-layout">
+      <!-- LLM / MCP 탭 -->
+      <section class="report-tabs-row">
+        <div class="report-tabs">
+          <a class="report-tab" href="./report.html">LLM</a>
           <a
-            class="side-link side-link--active"
-            href="./report_mcp_config.html"
+            class="report-tab report-tab--active"
+            href="./report_mcp_info.html"
           >
-            활성화된 MCP 개수
-          </a>
-          <a class="side-link" href="./report_mcp_config.html">
-            활성화된 MCP 타입 분포
-          </a>
-          <a class="side-link" href="./report_mcp_config.html">
-            시간대별 업데이트된 MCP 목록
-          </a>
-          <a class="side-link" href="./report_mcp_config.html">
-            호스트별 활성 MCP 개수 순위
+            MCP
           </a>
         </div>
-      </div>
-    </aside>
+      </section>
+
+      <!-- 메인 2컬럼 레이아웃 (좌: 사이드바 / 우: 콘텐츠) -->
+      <section class="report-main">
+        <!-- 좌측 사이드바 -->
+        <aside class="report-sidebar">
+          <div class="report-sidebar-inner">
+            <!-- OVERALL -->
+            <div class="side-group">
+              <div class="side-group-title">| OVERALL</div>
+              <a class="side-link" href="./report_mcp_info.html">
+                MCP 서버 사용 순위
+              </a>
+              <a class="side-link" href="./report_mcp_info.html">
+                MCP 사용량
+              </a>
+            </div>
+
+            <!-- INFORMATION BASED -->
+            <div class="side-group">
+              <div class="side-group-title">| INFORMATION BASED</div>
+              <a class="side-link" href="./report_mcp_information.html">
+                중요정보 탐지
+              </a>
+              <a class="side-link" href="./report_mcp_information.html">
+                서비스별 중요 정보 탐지
+              </a>
+              <a class="side-link" href="./report_mcp_information.html">
+                MCP 사용량 추이
+              </a>
+            </div>
+
+            <!-- CONFIG (현재 페이지) -->
+            <div class="side-group">
+              <div class="side-group-title">| CONFIG</div>
+              <a
+                class="side-link side-link--active"
+                href="./report_mcp_config.html"
+              >
+                활성화된 MCP 개수
+              </a>
+              <a class="side-link" href="./report_mcp_config.html">
+                활성화된 MCP 타입 분포
+              </a>
+              <a class="side-link" href="./report_mcp_config.html">
+                시간대별 업데이트된 MCP 목록
+              </a>
+              <a class="side-link" href="./report_mcp_config.html">
+                호스트별 활성 MCP 개수 순위
+              </a>
+            </div>
+          </div>
+        </aside>
 
         <!-- 메인 카드 영역 -->
         <section class="report-content">

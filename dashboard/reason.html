@@ -86,9 +86,48 @@
         font-weight: 600;
       }
 
+      /* ----- 프롬프트 위험 분석 상단 요약 스트립 ----- */
+      .reason-page .summary-strip {
+        margin-bottom: 16px;
+        padding: 10px 16px;
+        border-radius: 999px;
+        background: #f5f7fd;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        font-size: 12px;
+      }
+
+      .reason-page .summary-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .reason-page .summary-label {
+        font-weight: 600;
+        color: #1b2340;
+      }
+
+      .reason-page .summary-value {
+        color: #555b71;
+      }
+
+      .reason-page .summary-badge {
+        margin-left: auto;
+        padding: 4px 14px;
+        border-radius: 999px;
+        background: #1b2340;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      /* ----- 상단 intent 집계 카드 ----- */
       .reason-page .analysis-cards {
         display: flex;
         gap: 14px;
+        margin-bottom: 10px;
       }
 
       .reason-page .analysis-card {
@@ -116,6 +155,162 @@
         color: #9a9fb3;
       }
 
+      /* ----- 중요정보 유형별 탐지 현황 ----- */
+      .reason-page .type-row {
+        display: flex;
+        gap: 14px;
+        margin-top: 12px;
+        margin-bottom: 6px;
+      }
+
+      .reason-page .type-card {
+        flex: 1 1 0;
+        background: #f7f9ff;
+        border-radius: 14px;
+        padding: 10px 12px;
+      }
+
+      .reason-page .type-card h4 {
+        margin: 0 0 6px;
+        font-size: 13px;
+      }
+
+      .reason-page .type-card-sub {
+        font-size: 11px;
+        color: #8b90a5;
+        margin-bottom: 6px;
+      }
+
+      .reason-page .type-detail-title {
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+
+      .reason-page .type-detail-body {
+        font-size: 11px;
+        line-height: 1.5;
+        color: #33384b;
+      }
+
+      /* ----- 프롬프트 위험 분석 캐러셀 ----- */
+      .reason-page .carousel-wrapper {
+        margin-top: 18px;
+        border-radius: 16px;
+        background: #f7f9ff;
+        padding: 14px 18px;
+      }
+
+      .reason-page .carousel-header {
+        margin-bottom: 8px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .reason-page .carousel-inner {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 40px;
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .reason-page .carousel-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: #9a9fb3;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .reason-page .carousel-arrow.disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      .reason-page .prompt-panel,
+      .reason-page .analysis-panel {
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: 0 4px 10px rgba(20, 40, 80, 0.06);
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 140px;
+      }
+
+      .reason-page .panel-header {
+        font-size: 11px;
+        font-weight: 700;
+        text-align: center;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #1b2340;
+      }
+
+      .reason-page .panel-time {
+        font-size: 11px;
+        text-align: center;
+        color: #7a7f94;
+      }
+
+      .reason-page .panel-prompt-text {
+        flex: 1 1 auto;
+        margin-top: 4px;
+        font-size: 12px;
+        line-height: 1.5;
+        background: #f8f9ff;
+        border-radius: 8px;
+        padding: 8px 10px;
+        overflow-y: auto;
+      }
+
+      .reason-page .analysis-main-title {
+        margin-top: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        text-align: center;
+        color: #1b2340;
+      }
+
+      .reason-page .analysis-combo {
+        margin-top: 2px;
+        font-size: 11px;
+        text-align: center;
+        letter-spacing: 0.03em;
+        color: #555b71;
+      }
+
+      .reason-page .analysis-desc {
+        margin-top: 6px;
+        font-size: 11px;
+        text-align: center;
+        color: #444a63;
+      }
+
+      .reason-page .carousel-dots {
+        margin-top: 8px;
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .reason-page .carousel-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: #c5cada;
+      }
+
+      .reason-page .carousel-dot.active {
+        width: 16px;
+        background: #1b2340;
+      }
+
+      /* ----- 프롬프트 카드/테이블 섹션 ----- */
       .reason-page .prompt-cards {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -170,6 +365,37 @@
       @media (max-width: 1100px) {
         .reason-page .reason-row {
           flex-direction: column;
+        }
+
+        .reason-page .summary-strip {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 6px;
+          border-radius: 16px;
+        }
+
+        .reason-page .summary-badge {
+          margin-left: 0;
+        }
+
+        .reason-page .analysis-cards {
+          flex-direction: column;
+        }
+
+        .reason-page .type-row {
+          flex-direction: column;
+        }
+
+        .reason-page .carousel-inner {
+          grid-template-columns: 24px minmax(0, 1fr);
+          grid-template-rows: auto auto;
+          grid-template-areas:
+            "left prompt"
+            ". analysis";
+        }
+
+        .reason-page .carousel-arrow--prev {
+          grid-area: left;
         }
       }
     </style>
@@ -269,7 +495,32 @@
           </header>
 
           <div class="card-body">
-            <!-- 상단 요약 카드 -->
+            <!-- 종합 분석 결과 스트립 -->
+            <div class="summary-strip">
+              <div class="summary-item">
+                <span class="summary-label">종합 분석 결과</span>
+                <span
+                  id="reason-summary-overall"
+                  class="summary-value"
+                  >-</span
+                >
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">
+                  조사 필요 사용자 / 교육 필요 사용자
+                </span>
+                <span class="summary-value">
+                  <span id="reason-summary-investigate">0</span>명 /
+                  <span id="reason-summary-educate">0</span>명
+                </span>
+              </div>
+              <div class="summary-badge">
+                고의적 유출 의심 프롬프트 비율
+                <span id="reason-summary-intent-rate">0%</span>
+              </div>
+            </div>
+
+            <!-- intent 집계 카드 -->
             <div class="analysis-cards">
               <div class="analysis-card">
                 <div class="analysis-card-label">고의적 유출 의심</div>
@@ -297,7 +548,10 @@
               </div>
               <div class="analysis-card">
                 <div class="analysis-card-label">기타 / 판별불가</div>
-                <div id="reason-intent-unknown" class="analysis-card-value">
+                <div
+                  id="reason-intent-unknown"
+                  class="analysis-card-value"
+                >
                   0
                 </div>
                 <div class="analysis-card-sub">
@@ -306,13 +560,110 @@
               </div>
             </div>
 
+            <!-- 중요정보 유형별 탐지 현황 -->
+            <div class="type-row">
+              <div class="type-card">
+                <h4>중요정보 유형 별 탐지 현황</h4>
+                <div class="type-card-sub">
+                  고의적 / 부주의 / 정상 탐지된 유형 분포
+                </div>
+                <div style="height: 220px;">
+                  <canvas id="chart-reason-type"></canvas>
+                </div>
+              </div>
+
+              <div class="type-card">
+                <h4>고의적 유출 의심 라벨 상세</h4>
+                <div class="type-detail-title">
+                  상위 탐지 라벨 조합
+                </div>
+                <div
+                  id="reason-label-highrisk"
+                  class="type-detail-body"
+                >
+                  데이터가 아직 없습니다.
+                </div>
+
+                <h4 style="margin-top: 14px;">사용자 부주의 유출 라벨 상세</h4>
+                <div class="type-detail-title">
+                  반복적으로 노출된 라벨
+                </div>
+                <div
+                  id="reason-label-negligent"
+                  class="type-detail-body"
+                >
+                  데이터가 아직 없습니다.
+                </div>
+              </div>
+            </div>
+
+            <!-- 안내 문구 -->
             <p class="small-note">
               * 실제 운영 시 이 영역의 판단 로직은 로컬 LLM을 사용해 고도화할
               수 있습니다.
             </p>
 
-            <!-- 프롬프트별 카드 -->
-            <h4 style="margin-top: 16px; margin-bottom: 6px; font-size: 13px;">
+            <!-- 프롬프트 위험 분석 캐러셀 -->
+            <div class="carousel-wrapper">
+              <div class="carousel-header">프롬프트 위험 분석 결과</div>
+              <div class="carousel-inner">
+                <div
+                  id="reason-carousel-prev"
+                  class="carousel-arrow carousel-arrow--prev"
+                >
+                  ◀
+                </div>
+
+                <!-- USER PROMPT 패널 -->
+                <div class="prompt-panel">
+                  <div class="panel-header">USER PROMPT</div>
+                  <div
+                    id="reason-carousel-time"
+                    class="panel-time"
+                  >
+                    -
+                  </div>
+                  <div
+                    id="reason-carousel-prompt"
+                    class="panel-prompt-text"
+                  >
+                    분석 대상 프롬프트가 없습니다.
+                  </div>
+                </div>
+
+                <!-- ANALYSIS 패널 -->
+                <div class="analysis-panel">
+                  <div class="panel-header">ANALYSIS</div>
+                  <div class="analysis-main-title" id="reason-carousel-title">
+                    -
+                  </div>
+                  <div class="analysis-combo" id="reason-carousel-combo">
+                    -
+                  </div>
+                  <div class="analysis-desc" id="reason-carousel-desc">
+                    사전에 정의된 엔티티 조합이 탐지되면 이 영역에
+                    프롬프트 기반 위험 분석 결과가 표시됩니다.
+                  </div>
+                </div>
+
+                <div
+                  id="reason-carousel-next"
+                  class="carousel-arrow carousel-arrow--next"
+                >
+                  ▶
+                </div>
+              </div>
+
+              <div
+                id="reason-carousel-dots"
+                class="carousel-dots"
+              >
+                <!-- JS에서 점(dot) 생성 -->
+              </div>
+            </div>
+
+            <!-- 프롬프트 카드 목록 -->
+            <h4 style="margin-top: 20px; margin-bottom: 6px; font-size: 13px;">
               프롬프트별 상세 분석
             </h4>
             <div id="reason-prompt-cards" class="prompt-cards">

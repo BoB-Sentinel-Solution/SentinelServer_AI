@@ -87,6 +87,21 @@
     return apiGet("/logs", Object.assign(base, params || {}));
   }
 
+  // -------------------------
+  // /reason/top5 전용 헬퍼
+  // -------------------------
+  function fetchReasonTop5() {
+    return apiGet("/reason/top5");
+  }
+
+  // -------------------------
+  // /reason/summary 전용 헬퍼
+  //   params: { pc_name, host?, interface? }
+  // -------------------------
+  function fetchReasonSummary(params = {}) {
+    return apiGet("/reason/summary", params);
+  }
+
   // 전역 객체로 노출
   const api = {
     getAdminKey,
@@ -97,6 +112,8 @@
     fetchSummary,
     fetchLlmFileSummary,
     fetchLogs,
+    fetchReasonTop5,     // <<< 추가
+    fetchReasonSummary,  // <<< 추가
   };
 
   // 우리가 주로 쓸 이름 (객체 형태)

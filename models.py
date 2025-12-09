@@ -38,6 +38,11 @@ class LogRecord(Base):
     # 메타
     created_at      = Column(DateTime(timezone=True), default=datetime.now, nullable=False)
 
+    # Reason 페이지용 추가 정보
+    reason = Column(Text, nullable=True)          # 한 줄 분석 결과
+    reason_type = Column(String(32), nullable=True)   # "intentional" / "negligent" / "unknown"
+    risk_category = Column(String(64), nullable=True) # 예: "신원 정보 유출"
+    risk_pattern = Column(String(128), nullable=True) # 예: "NAME + PHONE + ADDRESS"
 
 class McpConfigEntry(Base):
     """

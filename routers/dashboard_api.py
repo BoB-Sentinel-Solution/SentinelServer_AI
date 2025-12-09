@@ -81,6 +81,197 @@ def require_admin(x_admin_key: str | None = Header(default=None)):
                 detail="Invalid API key",
             )
 
+# ---------------------------
+# Reason / Risk 패턴 정의
+# ---------------------------
+
+_RISK_PATTERNS = [
+    # 1. 신원 정보 유출
+    {
+        "category": "신원 정보 유출",
+        "labels": {"NAME", "PHONE", "ADDRESS"},
+        "pattern": "NAME + PHONE + ADDRESS",
+        "description": "개인을 특정하고 직접 연락 및 방문하여 피싱 가능",
+    },
+    {
+        "category": "신원 정보 유출",
+        "labels": {"NAME", "EMAIL", "ADDRESS", "POSTAL_CODE"},
+        "pattern": "NAME + EMAIL + ADDRESS + POSTAL_CODE",
+        "description": "온라인·오프라인 모두에서 특정인을 정밀하게 타겟팅 가능",
+    },
+
+    # 2. 신원 도용 · 본인인증 우회 계열
+    {
+        "category": "신원 도용 · 본인인증 우회 계열",
+        "labels": {"PASSPORT", "NAME", "ADDRESS"},
+        "pattern": "PASSPORT + NAME + ADDRESS",
+        "description": "여권 정보와 거주지가 결합되어 해외 출입·신분 사칭에 악용 가능",
+    },
+    {
+        "category": "신원 도용 · 본인인증 우회 계열",
+        "labels": {"DRIVER_LICENSE", "NAME", "PHONE"},
+        "pattern": "DRIVER_LICENSE + NAME + PHONE",
+        "description": "실명·연락처·공적 신분증 번호가 묶여 각종 본인인증 우회에 사용될 수 있음",
+    },
+    {
+        "category": "신원 도용 · 본인인증 우회 계열",
+        "labels": {"BUSINESS_ID", "NAME", "PHONE"},
+        "pattern": "BUSINESS_ID + NAME + PHONE",
+        "description": "특정 사업자를 정확히 식별해 피싱·사기성 비즈니스 메일 타겟팅에 악용 가능",
+    },
+    {
+        "category": "신원 도용 · 본인인증 우회 계열",
+        "labels": {"RESIDENT_ID", "NAME", "PHONE"},
+        "pattern": "RESIDENT_ID + NAME + PHONE",
+        "description": "실명 확인 체계와 직접적인 연관성이 있어 각종 본인인증 우회·금융사기 가능",
+    },
+
+    # 3. 금융 · 결제 탈취 계열
+    {
+        "category": "금융 · 결제 탈취 계열",
+        "labels": {"CARD_NUMBER", "CARD_EXPIRY", "CARD_CVV"},
+        "pattern": "CARD_NUMBER + CARD_EXPIRY + CARD_CVV",
+        "description": "온라인 결제에 필요한 카드번호·유효기간·CVV가 모두 포함되어 카드 실물 없이 결제가 가능",
+    },
+    {
+        "category": "금융 · 결제 탈취 계열",
+        "labels": {"CARD_NUMBER", "CARD_CVV", "PAYMENT_PIN"},
+        "pattern": "CARD_NUMBER + CARD_CVV + PAYMENT_PIN",
+        "description": "카드 정보와 인증 수단이 동시에 노출되어 고액 결제·인출에 직접 사용 가능",
+    },
+    {
+        "category": "금융 · 결제 탈취 계열",
+        "labels": {"MNEMONIC", "PAYMENT_URI_QR"},
+        "pattern": "MNEMONIC + PAYMENT_URI_QR",
+        "description": "지갑 복구용 시드와 송금 대상 정보가 함께 노출되어 가상자산 전체 탈취 가능",
+    },
+    {
+        "category": "금융 · 결제 탈취 계열",
+        "labels": {"CRYPTO_PRIVATE_KEY", "PAYMENT_URI_QR"},
+        "pattern": "CRYPTO_PRIVATE_KEY + PAYMENT_URI_QR",
+        "description": "특정 지갑 주소와 대응하는 프라이빗키가 함께 노출되어 잔액을 즉시 이체할 수 있음",
+    },
+    {
+        "category": "금융 · 결제 탈취 계열",
+        "labels": {"HD_WALLET", "MNEMONIC"},
+        "pattern": "HD_WALLET + MNEMONIC",
+        "description": "다수 지갑을 생성하는 상위 키와 시드가 동시에 유출되어 여러 주소를 장악 가능",
+    },
+
+    # 4. 위치·접근 위협 계열
+    {
+        "category": "위치·접근 위협 계열",
+        "labels": {"NAME", "ADDRESS", "POSTAL_CODE"},
+        "pattern": "NAME + ADDRESS + POSTAL_CODE",
+        "description": "특정 개인의 실제 거주 위치를 매우 정밀하게 식별 가능",
+    },
+    {
+        "category": "위치·접근 위협 계열",
+        "labels": {"PHONE", "ADDRESS", "POSTAL_CODE"},
+        "pattern": "PHONE + ADDRESS + POSTAL_CODE",
+        "description": "이름이 없어도 실제 거주지 기반 스토킹·피싱·방문 위협이 가능",
+    },
+]
+
+
+def classify_risk_from_entities(entities: List[Dict[str, Any]]) -> Dict[str, str]:
+    """
+    엔티티 라벨 조합으로 위험 카테고리/패턴/설명을 판별.
+    매칭이 없으면 '기타' 또는 '복합 정보 결합 위협'으로 분류.
+    """
+    labels = {
+        (e.get("label") or "").upper()
+        for e in (entities or [])
+        if e.get("label")
+    }
+    labels = {lab for lab in labels if lab}
+
+    # 정의된 패턴 우선 체크
+    for pat in _RISK_PATTERNS:
+        if pat["labels"].issubset(labels):
+            return {
+                "category": pat["category"],
+                "pattern": pat["pattern"],
+                "description": pat["description"],
+            }
+
+    # 중요 정보 5개 이상 동시 탐지 → 복합 정보 결합 위협
+    if len(labels) >= 5:
+        return {
+            "category": "복합 정보 결합 위협",
+            "pattern": "중요정보 5개 이상 동시 탐지",
+            "description": "중요정보 5개 이상이 동시에 포함되어 복합적인 공격 가능성이 높음",
+        }
+
+    # 그 외는 기타
+    return {
+        "category": "기타",
+        "pattern": " / ".join(sorted(labels)) if labels else "",
+        "description": "사전 정의되지 않은 조합의 중요정보가 탐지되었습니다.",
+    }
+
+
+_HIGH_INTENT_LABELS = {
+    "CARD_NUMBER",
+    "CARD_CVV",
+    "CARD_EXPIRY",
+    "MNEMONIC",
+    "CRYPTO_PRIVATE_KEY",
+    "HD_WALLET",
+    "PAYMENT_PIN",
+    "MOBILE_PAYMENT_PIN",
+    "RESIDENT_ID",
+    "PASSPORT",
+    "DRIVER_LICENSE",
+}
+
+
+def infer_intent_and_reason_from_context(
+    context_logs: List[LogRecord],
+    risk_info: Dict[str, str],
+) -> tuple[str, str]:
+    """
+    [임시 휴리스틱 버전]
+    - 여기 부분을 나중에 로컬 LLM 호출로 교체하면 됨.
+    - 현재는 고위험 금융/신분 계열 라벨 유무 + 반복 여부를 보고 의도/부주의를 나눔.
+    """
+    if not context_logs:
+        return "unknown", "맥락 로그가 부족하여 의도성을 판단하기 어렵습니다."
+
+    target = context_logs[-1]
+    labels = {
+        (e.get("label") or "").upper()
+        for e in (target.entities or [])
+        if e.get("label")
+    }
+
+    # 단순 휴리스틱: 고위험 라벨이 포함되어 있으면 'intentional'
+    if labels & _HIGH_INTENT_LABELS:
+        intent = "intentional"
+    else:
+        intent = "negligent"
+
+    prev_cnt = len(context_logs) - 1
+    pattern = risk_info.get("pattern") or "중요정보 조합"
+
+    if intent == "intentional":
+        if prev_cnt >= 2:
+            reason = (
+                f"동일 PC에서 최근 {prev_cnt + 1}회 연속으로 고위험 조합({pattern})이 "
+                "포함된 요청이 발생해 의도적인 유출 가능성이 높다고 판단됩니다."
+            )
+        else:
+            reason = (
+                f"고위험 조합({pattern})이 한 번에 포함되어 단순 실수보다는 "
+                "의도적인 정보 제공 가능성이 더 큽니다."
+            )
+    else:
+        reason = (
+            f"프롬프트 내에 {pattern}이 포함되었으나 반복성이 낮고 업무성 문맥으로 보여 "
+            "사용자 부주의 가능성이 더 높은 것으로 판단됩니다."
+        )
+
+    return intent, reason
 
 # ---------- 요약 API ----------
 @router.get("/summary", dependencies=[Depends(require_admin)])
@@ -408,6 +599,7 @@ def list_logs(
             "has_sensitive": r.has_sensitive,
             "file_blocked": r.file_blocked,
             "entities": r.entities or [],
+            "reason": getattr(r, "reason", None),
         })
 
     return {
@@ -877,3 +1069,179 @@ def report_llm_file_summary(
         "recent": recent,
     }
 
+# ---------- Reason 페이지: 탐지 건수 TOP 5 ----------
+
+@router.get("/reason/top5", dependencies=[Depends(require_admin)])
+def reason_top5(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Reason 페이지 상단 '탐지 건수 TOP 5'용 데이터.
+    - has_sensitive=True 인 로그만 대상으로
+      host + hostname(PC Name) 기준 탐지 건수 TOP5.
+    """
+    cnt_expr = func.count(LogRecord.request_id)
+
+    rows = (
+        db.query(
+            LogRecord.hostname.label("pc_name"),
+            LogRecord.host.label("host"),
+            LogRecord.public_ip.label("public_ip"),
+            LogRecord.private_ip.label("private_ip"),
+            cnt_expr.label("count"),
+        )
+        .filter(LogRecord.has_sensitive.is_(True))
+        .group_by(
+            LogRecord.hostname,
+            LogRecord.host,
+            LogRecord.public_ip,
+            LogRecord.private_ip,
+        )
+        .order_by(cnt_expr.desc())
+        .limit(5)
+        .all()
+    )
+
+    items: List[Dict[str, Any]] = []
+    for r in rows:
+        items.append(
+            {
+                "pc_name": r.pc_name or "UNKNOWN",
+                "host": r.host,
+                "public_ip": r.public_ip,
+                "private_ip": r.private_ip,
+                "count": r.count,
+            }
+        )
+
+    return {"items": items}
+
+# ---------- Reason 페이지: 선택된 PC 상세 분석 ----------
+
+@router.get("/reason/summary", dependencies=[Depends(require_admin)])
+def reason_summary(
+    pc_name: str,
+    host: str | None = None,
+    interface: str | None = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    특정 PC (hostname 기준)에 대해:
+    - 중요정보 탐지 로그 목록
+    - 각 로그의 위험 카테고리/패턴/설명
+    - 간단한 의도성(고의/부주의) 판단 및 Reason 한 줄
+    을 반환.
+
+    (현재 intent 판단은 휴리스틱 기반이며,
+     향후 이 부분을 로컬 LLM 호출로 대체 가능)
+    """
+    if not pc_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="pc_name is required",
+        )
+
+    q = db.query(LogRecord).filter(LogRecord.has_sensitive.is_(True))
+    q = q.filter(LogRecord.hostname == pc_name)
+
+    if host:
+        q = q.filter(LogRecord.host == host)
+    if interface:
+        q = q.filter(func.lower(LogRecord.interface) == interface.lower())
+
+    logs: List[LogRecord] = q.order_by(LogRecord.created_at.asc()).all()
+
+    if not logs:
+        return {
+            "pc_name": pc_name,
+            "host": host,
+            "interface": interface,
+            "log_count": 0,
+            "intent_counts": {},
+            "risk_category_counts": {},
+            "cards": [],
+            "logs": [],
+        }
+
+    intent_counts: Counter[str] = Counter()
+    risk_category_counts: Counter[str] = Counter()
+
+    cards: List[Dict[str, Any]] = []
+    table_rows: List[Dict[str, Any]] = []
+
+    for idx, r in enumerate(logs):
+        entities = r.entities or []
+        risk_info = classify_risk_from_entities(entities)
+
+        # 최근 5개 + 현재 로그까지 컨텍스트
+        start = max(0, idx - 5)
+        context_logs = logs[start : idx + 1]
+
+        intent_type, reason_text = infer_intent_and_reason_from_context(
+            context_logs, risk_info
+        )
+
+        intent_counts[intent_type] += 1
+        risk_category_counts[risk_info["category"]] += 1
+
+        # DB 컬럼이 있으면 저장 (없으면 조용히 무시)
+        if hasattr(r, "reason"):
+            r.reason = reason_text
+        if hasattr(r, "reason_type"):
+            r.reason_type = intent_type
+        if hasattr(r, "risk_category"):
+            r.risk_category = risk_info["category"]
+        if hasattr(r, "risk_pattern"):
+            r.risk_pattern = risk_info["pattern"]
+
+        # 카드용 (프롬프트 위험 분석 결과)
+        cards.append(
+            {
+                "time": r.created_at.isoformat() if r.created_at else getattr(r, "time", None),
+                "host": r.host,
+                "pc_name": r.hostname,
+                "public_ip": r.public_ip,
+                "private_ip": r.private_ip,
+                "prompt": (
+                    (r.prompt[:240] + "…")
+                    if r.prompt and len(r.prompt) > 240
+                    else (r.prompt or "")
+                ),
+                "entities": [
+                    {"label": (e.get("label") or ""), "value": e.get("value")}
+                    for e in entities
+                ],
+                "risk_category": risk_info["category"],
+                "risk_pattern": risk_info["pattern"],
+                "risk_description": risk_info["description"],
+                "intent_type": intent_type,
+                "reason": reason_text,
+            }
+        )
+
+        # 하단 테이블용
+        table_rows.append(
+            {
+                "time": r.created_at.isoformat() if r.created_at else getattr(r, "time", None),
+                "host": r.host,
+                "pc_name": r.hostname,
+                "public_ip": r.public_ip,
+                "private_ip": r.private_ip,
+                "action": r.action,
+                "has_sensitive": r.has_sensitive,
+                "reason": reason_text,
+                "reason_type": intent_type,
+                "risk_category": risk_info["category"],
+            }
+        )
+
+    # get_db()에서 자동 commit 되므로, 위의 r.reason 등 변경사항이 DB에 반영됨.
+
+    return {
+        "pc_name": pc_name,
+        "host": host,
+        "interface": interface,
+        "log_count": len(logs),
+        "intent_counts": dict(intent_counts),
+        "risk_category_counts": dict(risk_category_counts),
+        "cards": cards,
+        "logs": table_rows,
+    }

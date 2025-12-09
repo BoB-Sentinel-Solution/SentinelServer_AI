@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel · Reason Analysis</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+
+    <style>
+      .reason-page .reason-layout {
+        max-width: 1440px;
+        margin: 24px auto 40px;
+        padding: 0 24px;
+      }
+
+      .reason-page .reason-row {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .reason-page .reason-card--full {
+        flex: 1 1 100%;
+      }
+
+      .reason-page .reason-card--half {
+        flex: 1 1 0;
+      }
+
+      .reason-page .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .reason-page table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      .reason-page thead {
+        background: #f5f7fd;
+      }
+
+      .reason-page th,
+      .reason-page td {
+        white-space: nowrap;
+        padding: 8px 10px;
+        font-size: 12px;
+        border-bottom: 1px solid #f0f2fa;
+      }
+
+      .reason-page th {
+        font-weight: 700;
+        color: #1b2340;
+        border-bottom: 1px solid #dde3f5;
+        text-align: left;
+      }
+
+      .reason-page tbody tr:nth-child(even) td {
+        background: #fafbff;
+      }
+
+      .reason-page tbody tr:hover td {
+        background: #eef3ff;
+      }
+
+      .reason-page .top5-footer {
+        margin-top: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: #555b71;
+      }
+
+      .reason-page .top5-selected {
+        font-weight: 600;
+        color: #1b2340;
+      }
+
+      .reason-page .top5-row--selected td {
+        background: #e5ecff !important;
+        font-weight: 600;
+      }
+
+      .reason-page .analysis-cards {
+        display: flex;
+        gap: 14px;
+      }
+
+      .reason-page .analysis-card {
+        flex: 1 1 0;
+        background: #f5f7fb;
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .reason-page .analysis-card-label {
+        font-size: 12px;
+        color: #6b7083;
+      }
+
+      .reason-page .analysis-card-value {
+        font-size: 26px;
+        font-weight: 700;
+      }
+
+      .reason-page .analysis-card-sub {
+        font-size: 11px;
+        color: #9a9fb3;
+      }
+
+      .reason-page .prompt-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 14px;
+      }
+
+      .reason-page .prompt-card {
+        border-radius: 12px;
+        background: #f7f9ff;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .reason-page .prompt-meta {
+        font-size: 11px;
+        color: #7a7f94;
+      }
+
+      .reason-page .prompt-text {
+        font-size: 12px;
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 8px 10px;
+        height: 72px;
+        overflow: hidden;
+      }
+
+      .reason-page .prompt-risk-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #d63c3c;
+      }
+
+      .reason-page .prompt-risk-desc {
+        font-size: 11px;
+        color: #444a63;
+      }
+
+      .reason-page .prompt-reason {
+        font-size: 11px;
+        color: #2d3550;
+      }
+
+      .reason-page .small-note {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #8b90a5;
+      }
+
+      @media (max-width: 1100px) {
+        .reason-page .reason-row {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+
+  <body class="sentinel-body reason-page">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+          <a class="top-menu-item" href="./report.html">Report</a>
+          <a class="top-menu-item" href="./logs.html">Logs</a>
+          <a class="top-menu-item top-menu-item--active" href="./reason.html">
+            Reason
+          </a>
+          <a class="top-menu-item" href="./network.html">Network</a>
+          <a class="top-menu-item" href="./settings.html">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <main class="reason-layout">
+      <!-- 1. 탐지 건수 TOP 5 -->
+      <section class="reason-row">
+        <article class="card reason-card--full">
+          <header class="card-header">
+            <h3 class="card-title">탐지 건수 TOP 5</h3>
+            <span class="card-subtitle">
+              PC Name + Host 기준 중요정보 탐지 건수 상위 5개
+            </span>
+          </header>
+          <div class="card-body">
+            <div style="height: 220px;">
+              <canvas id="chart-reason-top5"></canvas>
+            </div>
+
+            <div class="table-wrapper" style="margin-top: 10px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>PC Name</th>
+                    <th>Host</th>
+                    <th>Public IP</th>
+                    <th>Private IP</th>
+                    <th>탐지 건수</th>
+                  </tr>
+                </thead>
+                <tbody id="reason-top5-body">
+                  <tr>
+                    <td colspan="5">데이터를 불러오는 중...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="top5-footer">
+              <div>
+                선택된 PC:
+                <span id="reason-selected-pc" class="top5-selected">-</span>
+              </div>
+              <div>
+                <button id="btn-reason-analyze" class="btn btn-small">
+                  분석하기
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- 2. PC 선택 후 분석 결과 영역 -->
+      <section
+        id="reason-analysis-section"
+        class="reason-row"
+        style="display: none;"
+      >
+        <article class="card reason-card--full">
+          <header class="card-header">
+            <h3 class="card-title">프롬프트 위험 분석 결과</h3>
+            <span class="card-subtitle">
+              선택된 PC 기준 중요정보 탐지 로그에 대한 AI 분석 요약
+            </span>
+          </header>
+
+          <div class="card-body">
+            <!-- 상단 요약 카드 -->
+            <div class="analysis-cards">
+              <div class="analysis-card">
+                <div class="analysis-card-label">고의적 유출 의심</div>
+                <div
+                  id="reason-intent-intentional"
+                  class="analysis-card-value"
+                >
+                  0
+                </div>
+                <div class="analysis-card-sub">
+                  최근 분석된 로그 중 의도적인 중요정보 제공으로 판단된 건수
+                </div>
+              </div>
+              <div class="analysis-card">
+                <div class="analysis-card-label">사용자 부주의</div>
+                <div
+                  id="reason-intent-negligent"
+                  class="analysis-card-value"
+                >
+                  0
+                </div>
+                <div class="analysis-card-sub">
+                  실수·부주의로 인한 노출 가능성이 높은 건수
+                </div>
+              </div>
+              <div class="analysis-card">
+                <div class="analysis-card-label">기타 / 판별불가</div>
+                <div id="reason-intent-unknown" class="analysis-card-value">
+                  0
+                </div>
+                <div class="analysis-card-sub">
+                  맥락이 부족하거나 패턴에 맞지 않아 의도성 판단이 어려운 건수
+                </div>
+              </div>
+            </div>
+
+            <p class="small-note">
+              * 실제 운영 시 이 영역의 판단 로직은 로컬 LLM을 사용해 고도화할
+              수 있습니다.
+            </p>
+
+            <!-- 프롬프트별 카드 -->
+            <h4 style="margin-top: 16px; margin-bottom: 6px; font-size: 13px;">
+              프롬프트별 상세 분석
+            </h4>
+            <div id="reason-prompt-cards" class="prompt-cards">
+              <!-- JS에서 삽입 -->
+            </div>
+
+            <!-- 하단 로그 테이블 -->
+            <h4 style="margin-top: 18px; margin-bottom: 6px; font-size: 13px;">
+              중요정보 탐지 로그 (요약)
+            </h4>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Host</th>
+                    <th>PC Name</th>
+                    <th>Public IP</th>
+                    <th>Private IP</th>
+                    <th>Action</th>
+                    <th>Risk Category</th>
+                    <th>Intent</th>
+                    <th>Reason</th>
+                  </tr>
+                </thead>
+                <tbody id="reason-log-tbody">
+                  <!-- JS에서 삽입 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/reason.js"></script>
+  </body>
+</html>

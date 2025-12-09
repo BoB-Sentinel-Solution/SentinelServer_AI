@@ -64,7 +64,6 @@
 
   // -------------------------
   // /summary 전용 헬퍼
-  //   - 사용 예: fetchSummary({ interface: "LLM" })
   // -------------------------
   function fetchSummary(params = {}) {
     return apiGet("/summary", params);
@@ -72,7 +71,6 @@
 
   // -------------------------
   // /report/llm/file-summary 전용 헬퍼
-  //   - 사용 예: fetchLlmFileSummary()
   // -------------------------
   function fetchLlmFileSummary() {
     return apiGet("/report/llm/file-summary");
@@ -80,7 +78,6 @@
 
   // -------------------------
   // /logs 전용 헬퍼
-  //   - 사용 예: fetchLogs({ page: 1, page_size: 20, q: "chatgpt.com", category: "host" })
   // -------------------------
   function fetchLogs(params = {}) {
     const base = { page: 1, page_size: 20 };
@@ -112,18 +109,17 @@
     fetchSummary,
     fetchLlmFileSummary,
     fetchLogs,
-    fetchReasonTop5,     // <<< 추가
-    fetchReasonSummary,  // <<< 추가
+    fetchReasonTop5,
+    fetchReasonSummary,
   };
 
-  // 우리가 주로 쓸 이름 (객체 형태)
   global.SentinelApi = api;
-  // 혹시 다른 파일에서 SentinelAPI 로 잘못 쓴 경우도 대응
-  global.SentinelAPI = api;
+  global.SentinelAPI = api; // 오타 대비
 
   // ---- 기존 코드 호환용: 개별 함수도 전역으로 직접 노출 ----
-  // report_llm_file.js 등에서 그냥 fetchLlmFileSummary()로 호출하는 경우 지원
   global.fetchSummary = fetchSummary;
   global.fetchLlmFileSummary = fetchLlmFileSummary;
   global.fetchLogs = fetchLogs;
+  global.fetchReasonTop5 = fetchReasonTop5;
+  global.fetchReasonSummary = fetchReasonSummary;
 })(window);

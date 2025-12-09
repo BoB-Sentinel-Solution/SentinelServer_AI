@@ -173,6 +173,64 @@ _RISK_PATTERNS = [
     },
 ]
 
+# ---------- 위험 라벨 조합 (캐러셀용) ----------
+
+DANGEROUS_LABEL_COMBOS: List[List[str]] = [
+    # 1. 신원 정보 유출
+    ["NAME", "PHONE", "ADDRESS"],
+    ["NAME", "EMAIL", "ADDRESS", "POSTAL_CODE"],
+    # 2. 신원 도용 · 본인인증 우회 계열
+    ["PASSPORT", "NAME", "ADDRESS"],
+    ["DRIVER_LICENSE", "NAME", "PHONE"],
+    ["BUSINESS_ID", "NAME", "PHONE"],
+    ["RESIDENT_ID", "NAME", "PHONE"],
+    # 3. 금융 · 결제 탈취 계열
+    ["CARD_NUMBER", "CARD_EXPIRY", "CARD_CVV"],
+    ["CARD_NUMBER", "CARD_CVV", "PAYMENT_PIN"],
+    ["MNEMONIC", "PAYMENT_URI_QR"],
+    ["CRYPTO_PRIVATE_KEY", "PAYMENT_URI_QR"],
+    ["HD_WALLET", "MNEMONIC"],
+    # 4. 위치·접근 위협 계열
+    ["NAME", "ADDRESS", "POSTAL_CODE"],
+    ["PHONE", "ADDRESS", "POSTAL_CODE"],
+]
+
+
+def _extract_label_set(entities: List[Dict[str, Any]]) -> set[str]:
+  """엔티티 배열에서 라벨만 모아 대문자 set으로 반환."""
+  labels: set[str] = set()
+  for e in entities or []:
+      lab = (e.get("label") or e.get("LABEL") or "").upper()
+      if lab:
+          labels.add(lab)
+  return labels
+
+
+def detect_combo_labels(entities: List[Dict[str, Any]]) -> List[str]:
+  """
+  사전에 정의한 라벨 조합이 있는지 확인해서,
+  발견되면 그 콤보 라벨 리스트를 그대로 반환.
+  없으면, 중요정보가 5개 이상이면 그 라벨 집합을 반환(복합 위협),
+  그 외엔 빈 리스트.
+  """
+  label_set = _extract_label_set(entities)
+  if not label_set:
+      return []
+
+  # 3~4개짜리 사전 정의 조합 먼저 탐지
+  for combo in DANGEROUS_LABEL_COMBOS:
+      s = set(combo)
+      if s.issubset(label_set):
+          # 프론트에서 rule.labels와 정확히 비교하므로
+          # 콤보에 들어있는 라벨만 그대로 넘겨준다.
+          return combo
+
+  # 복합 정보 결합 위협: 중요정보 5개 이상
+  if len(label_set) >= 5:
+      return sorted(label_set)
+
+  return []
+
 
 def classify_risk_from_entities(entities: List[Dict[str, Any]]) -> Dict[str, str]:
     """
@@ -1114,6 +1172,7 @@ def reason_top5(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
     return {"items": items}
 
+
 # ---------- Reason 페이지: 선택된 PC 상세 분석 ----------
 
 @router.get("/reason/summary", dependencies=[Depends(require_admin)])
@@ -1130,8 +1189,8 @@ def reason_summary(
     - 간단한 의도성(고의/부주의) 판단 및 Reason 한 줄
     을 반환.
 
-    (현재 intent 판단은 휴리스틱 기반이며,
-     향후 이 부분을 로컬 LLM 호출로 대체 가능)
+    (현재 intent 판단은 휴리스틱/로컬 LLM 기반이며,
+     향후 고도화 가능)
     """
     if not pc_name:
         raise HTTPException(
@@ -1155,7 +1214,11 @@ def reason_summary(
             "host": host,
             "interface": interface,
             "log_count": 0,
-            "intent_counts": {},
+            "overall_result": "",
+            "investigate_users": 0,
+            "educate_users": 0,
+            "intent_rate": 0.0,
+            "intent_counts": {"intentional": 0, "negligent": 0, "unknown": 0},
             "risk_category_counts": {},
             "cards": [],
             "logs": [],
@@ -1179,8 +1242,15 @@ def reason_summary(
             context_logs, risk_info
         )
 
+        # None 등은 전부 unknown으로 정규화
+        if intent_type not in ("intentional", "negligent", "unknown"):
+            intent_type = "unknown"
+
         intent_counts[intent_type] += 1
         risk_category_counts[risk_info["category"]] += 1
+
+        # 위험 콤보 라벨 (캐러셀용)
+        combo_labels = detect_combo_labels(entities)
 
         # DB 컬럼이 있으면 저장 (없으면 조용히 무시)
         if hasattr(r, "reason"):
@@ -1214,10 +1284,11 @@ def reason_summary(
                 "risk_description": risk_info["description"],
                 "intent_type": intent_type,
                 "reason": reason_text,
+                "combo_labels": combo_labels,
             }
         )
 
-        # 하단 테이블용
+        # 하단 테이블용 (그래프 계산 위해 entities 포함)
         table_rows.append(
             {
                 "time": r.created_at.isoformat() if r.created_at else getattr(r, "time", None),
@@ -1230,17 +1301,49 @@ def reason_summary(
                 "reason": reason_text,
                 "reason_type": intent_type,
                 "risk_category": risk_info["category"],
+                "entities": entities,
             }
         )
 
-    # get_db()에서 자동 commit 되므로, 위의 r.reason 등 변경사항이 DB에 반영됨.
+    # 의도성 통계 → 종합 분석 결과용 숫자/문구 생성
+    intentional = intent_counts.get("intentional", 0)
+    negligent = intent_counts.get("negligent", 0)
+    unknown = intent_counts.get("unknown", 0)
+    total = intentional + negligent + unknown
+
+    if total > 0:
+        intent_rate = (intentional / total) * 100.0
+    else:
+        intent_rate = 0.0
+
+    overall_result = f"조사 필요 {intentional}건, 교육 필요 {negligent}건"
+
+    # 여기서는 '조사 필요 사용자/교육 필요 사용자'를
+    # 일단 건수 기준으로 그대로 사용 (원하면 향후 사용자 단위로 변경 가능)
+    investigate_users = intentional
+    educate_users = negligent
+
+    # 필요하다면 여기서 db.commit() 호출 (세션 정책에 따라)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        # 실패하더라도 조회용 API라서 그대로 반환은 가능
 
     return {
         "pc_name": pc_name,
         "host": host,
         "interface": interface,
         "log_count": len(logs),
-        "intent_counts": dict(intent_counts),
+        "overall_result": overall_result,
+        "investigate_users": investigate_users,
+        "educate_users": educate_users,
+        "intent_rate": intent_rate,
+        "intent_counts": {
+            "intentional": intentional,
+            "negligent": negligent,
+            "unknown": unknown,
+        },
         "risk_category_counts": dict(risk_category_counts),
         "cards": cards,
         "logs": table_rows,

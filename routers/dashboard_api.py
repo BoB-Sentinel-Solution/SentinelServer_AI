@@ -15,6 +15,7 @@ from sqlalchemy import cast, Text, func  # JSON 검색 + interface 필터용
 from db import SessionLocal, Base, engine
 from models import LogRecord, McpConfigEntry
 from config import settings
+from services.reason_llm import infer_intent_with_llm
   
 # 접두는 app.py에서 prefix="/api"로 부여
 router = APIRouter()
@@ -1238,9 +1239,12 @@ def reason_summary(
         start = max(0, idx - 5)
         context_logs = logs[start : idx + 1]
 
-        intent_type, reason_text = infer_intent_and_reason_from_context(
-            context_logs, risk_info
-        )
+        #intent_type, reason_text = infer_intent_and_reason_from_context(
+        #    context_logs, risk_info
+        #)
+
+        # 로컬 LLM 판단으로 변경
+        intent_type, reason_text = infer_intent_with_llm(context_logs, risk_info)
 
         # None 등은 전부 unknown으로 정규화
         if intent_type not in ("intentional", "negligent", "unknown"):

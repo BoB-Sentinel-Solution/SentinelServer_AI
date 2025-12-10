@@ -27,7 +27,7 @@
     PAYMENT_PIN: "결제 PIN",
     MOBILE_PAYMENT_PIN: "모바일 결제 PIN",
     PAYMENT_URI_QR: "결제 URI/QR",
-    MNEMONIC: "지갑 니모닉",
+    MNEMONIC: "지갑 복구키",
     CRYPTO_PRIVATE_KEY: "암호화폐 개인키",
     HD_WALLET: "HD 월렛키",
     IPV4: "IPv4",
@@ -207,6 +207,36 @@
     });
   }
 
+  // Prediction 카드에 "가장 많이 탐지된 라벨" 표시
+  function updatePredictionLabel(data) {
+    const el = document.getElementById("mcp-pred-main-labels");
+    if (!el) return;
+
+    const typeRatio = data.type_ratio || {};
+    const entries = Object.entries(typeRatio);
+
+    // 아무 라벨도 없으면 기본 문구
+    if (!entries.length) {
+      el.textContent = "중요정보";
+      return;
+    }
+
+    // 최댓값 찾기
+    let maxCount = 0;
+    entries.forEach(([, count]) => {
+      if (count > maxCount) maxCount = count;
+    });
+
+    // 최댓값과 같은 라벨들만 필터링 (공동 1등 전부)
+    const topLabels = entries
+      .filter(([, count]) => count === maxCount)
+      .map(([label]) => LABEL_KR_MAP[label] || label);
+
+    // "전화번호, 이메일" 이런 식으로 표시
+    el.textContent = topLabels.join(", ");
+  }
+
+
   async function loadData(range) {
     if (!fetchSummary) {
       console.error("SentinelAPI.fetchSummary 가 정의되지 않았습니다.");
@@ -219,6 +249,7 @@
     renderTypeTotalChart(data);
     renderByHostChart(data);
     renderUsageTrendChart(data);
+    updatePredictionLabel(data);
     formatUpdatedAt();
   }
 

@@ -72,47 +72,65 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* -----------------------
-   차트 1: 전체 서비스 사용량
-   (시간대별 호출 수 라인 차트)
+   차트 1: 전체 서비스 사용량 비율
+   (서비스/Host 별 호출 비중 도넛 차트)
    ----------------------- */
 
 function renderServiceTotalUsage(summary) {
-  const ctx = document.getElementById("chart-service-total-usage");
-  if (!ctx) return;
+  const canvas = document.getElementById("chart-service-total-usage");
+  if (!canvas) return;
 
-  const hourlyAttempts = summary.hourly_attempts || [];
-  const labels = Array.from({ length: 24 }, (_, i) => `${i}시`);
+  // TODO: 백엔드에서 service_usage_by_host 를 제공하면 그 값을 사용.
+  // 아직 없다면, 임시로 service_sensitive_by_host 를 사용해 비율만 표현.
+  const usageByHost =
+    summary.service_usage_by_host || summary.service_sensitive_by_host || {};
 
-  const data = labels.map((_, idx) => hourlyAttempts[idx] || 0);
+  const entries = Object.entries(usageByHost);
+  if (entries.length === 0) {
+    if (svcTotalUsageChart) {
+      svcTotalUsageChart.destroy();
+      svcTotalUsageChart = null;
+    }
+    return;
+  }
+
+  // 호출 수 기준 내림차순 정렬
+  entries.sort((a, b) => (b[1] || 0) - (a[1] || 0));
+
+  const labels = entries.map(([host]) => host || "unknown");
+  const data = entries.map(([, count]) => count || 0);
 
   if (svcTotalUsageChart) svcTotalUsageChart.destroy();
 
+  const ctx = canvas.getContext("2d");
   svcTotalUsageChart = new Chart(ctx, {
-    type: "line",
+    type: "doughnut",
     data: {
       labels,
       datasets: [
         {
-          label: "전체 서비스 사용량",
+          label: "호출 비율",
           data,
-          tension: 0.3,
-          borderWidth: 2,
-          pointRadius: 2,
+          borderWidth: 1,
         },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { precision: 0 },
-        },
-      },
+      cutout: "55%",
       plugins: {
         legend: {
-          display: false,
+          position: "right",
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const label = ctx.label || "";
+              const val = ctx.parsed || 0;
+              return `${label}: ${val}회`;
+            },
+          },
         },
       },
     },
@@ -246,7 +264,7 @@ function renderServiceHourlyUsage(summary) {
 }
 
 /* -----------------------
-   위험 지수 표시
+   위험 지수 표시 + 서비스별 위험 TOP3 패널
    ----------------------- */
 
 function renderServiceRiskLevel(summary, el) {
@@ -262,6 +280,48 @@ function renderServiceRiskLevel(summary, el) {
     else if (today >= 3 || ratio > 0.15) level = "보통";
     else if (today > 0) level = "낮음";
   }
-
   el.textContent = level;
+
+  // ----- 우측 "서비스별 위험 TOP 3" 리스트 업데이트 -----
+  const listEl = document.getElementById("service-risk-top-list");
+  if (!listEl) return;
+
+  const byHost = summary.service_sensitive_by_host || {};
+  const entries = Object.entries(byHost);
+
+  listEl.innerHTML = "";
+
+  if (!entries.length) {
+    const li = document.createElement("li");
+    const spanLabel = document.createElement("span");
+    spanLabel.className = "service-risk-label";
+    spanLabel.textContent = "데이터 없음";
+    const spanMeta = document.createElement("span");
+    spanMeta.className = "service-risk-meta";
+    spanMeta.textContent = "-";
+    li.appendChild(spanLabel);
+    li.appendChild(spanMeta);
+    listEl.appendChild(li);
+    return;
+  }
+
+  // 현재는 "탐지 건수" 기준 TOP3 (추후 호출 수 대비 비율로 확장 가능)
+  entries.sort((a, b) => (b[1] || 0) - (a[1] || 0));
+  const top3 = entries.slice(0, 3);
+
+  top3.forEach(([host, count]) => {
+    const li = document.createElement("li");
+
+    const spanLabel = document.createElement("span");
+    spanLabel.className = "service-risk-label";
+    spanLabel.textContent = host || "unknown";
+
+    const spanMeta = document.createElement("span");
+    spanMeta.className = "service-risk-meta";
+    spanMeta.textContent = `${count || 0}건 탐지`;
+
+    li.appendChild(spanLabel);
+    li.appendChild(spanMeta);
+    listEl.appendChild(li);
+  });
 }

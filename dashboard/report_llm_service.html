@@ -7,6 +7,67 @@
 
     <link rel="stylesheet" href="./vendor/reset.min.css" />
     <link rel="stylesheet" href="./css/styles.css" />
+
+    <!-- Service-based 페이지 전용 레이아웃 보조 스타일 -->
+    <style>
+      .service-trend-layout {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+      }
+      .service-trend-main {
+        flex: 3 1 0;
+      }
+      .service-risk-panel {
+        flex: 1 1 260px;
+        background: #f7f9ff;
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 12px;
+      }
+      .service-risk-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .service-risk-sub {
+        font-size: 11px;
+        color: #8b90a5;
+        margin-bottom: 8px;
+      }
+      .service-risk-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        font-size: 12px;
+      }
+      .service-risk-list li {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        border-bottom: 1px solid #edf0fb;
+      }
+      .service-risk-list li:last-child {
+        border-bottom: none;
+      }
+      .service-risk-label {
+        font-weight: 600;
+      }
+      .service-risk-meta {
+        color: #6b7083;
+      }
+      .service-risk-note {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #8b90a5;
+      }
+
+      @media (max-width: 1024px) {
+        .service-trend-layout {
+          flex-direction: column;
+        }
+      }
+    </style>
   </head>
   <body class="sentinel-body">
     <!-- 상단 네비게이션 바 -->
@@ -57,7 +118,9 @@
               <div class="side-group-title">| OVERALL</div>
               <a class="side-link" href="./report.html">탐지된 중요정보 비율</a>
               <a class="side-link" href="./report.html#stats">중요정보 탐지 통계</a>
-              <a class="side-link" href="./report.html#trend">시간대 별 중요정보 탐지 추이</a>
+              <a class="side-link" href="./report.html#trend"
+                >시간대 별 중요정보 탐지 추이</a
+              >
             </div>
 
             <!-- TIME BASED -->
@@ -71,7 +134,10 @@
             <!-- SERVICE BASED -->
             <div class="side-group">
               <div class="side-group-title">| SERVICE BASED</div>
-              <a class="side-link side-link--active" href="./report_llm_service.html">
+              <a
+                class="side-link side-link--active"
+                href="./report_llm_service.html"
+              >
                 전체 서비스 사용량 / 서비스 별 중요정보 탐지
               </a>
               <a class="side-link" href="./report_llm_service.html#trend">
@@ -79,7 +145,7 @@
               </a>
             </div>
 
-            <!-- FILE BASED (현재 페이지) -->
+            <!-- FILE BASED -->
             <div class="side-group">
               <div class="side-group-title">| FILE BASED</div>
               <a class="side-link" href="./report_llm_file.html">
@@ -99,20 +165,27 @@
         <section class="report-content">
           <!-- 상단 2개 카드 -->
           <div class="report-row">
+            <!-- 1번: 서비스별 호출 비율 (원형 그래프) -->
             <article class="card report-card-half">
               <header class="card-header">
-                <h3 class="card-title">전체 서비스 사용량</h3>
-                <span class="card-subtitle">LLM 호출 기준, 최근 24시간</span>
+                <h3 class="card-title">전체 서비스 사용량 비율</h3>
+                <span class="card-subtitle"
+                  >최근 24시간 기준, LLM 호출이 발생한 서비스(Host)별 비중</span
+                >
               </header>
               <div class="card-body">
+                <!-- JS에서 doughnut/pie 차트로 렌더링 -->
                 <canvas id="chart-service-total-usage" height="200"></canvas>
               </div>
             </article>
 
+            <!-- 2번: 서비스 별 중요 정보 탐지 (막대 그래프 그대로) -->
             <article class="card report-card-half">
               <header class="card-header">
                 <h3 class="card-title">서비스 별 중요 정보 탐지</h3>
-                <span class="card-subtitle">LLM 인터페이스 기준, 호스트 도메인 단위</span>
+                <span class="card-subtitle"
+                  >LLM 인터페이스 기준, 호스트 도메인 단위 중요정보 탐지 건수</span
+                >
               </header>
               <div class="card-body">
                 <canvas
@@ -123,39 +196,60 @@
             </article>
           </div>
 
-          <!-- 하단 1개 카드 (풀폭) -->
+          <!-- 하단 카드 : 시간대 추이 + 서비스별 위험 TOP3 -->
           <div class="report-row">
             <article class="card report-card-full">
               <header class="card-header report-card-header-full">
                 <div>
                   <h3 class="card-title">시간대 별 서비스 사용량 추이</h3>
                   <span class="card-subtitle">
-                    최근 24시간 기준, LLM 서비스 전체 트래픽
+                    최근 24시간 기준, LLM 서비스 전체 트래픽 및 중요정보 탐지 스파이크
                   </span>
                 </div>
 
                 <div class="report-full-controls">
                   <div class="report-risk-indicator">
-                    <span class="report-risk-label">오늘의 위험 지수:</span>
                     <span class="report-risk-dot"></span>
-                    <span
-                      id="service-risk-level"
-                      class="report-risk-level"
-                      >-</span
-                    >
+                    <span id="service-risk-level" class="report-risk-level">-</span>
                   </div>
                 </div>
               </header>
 
               <div class="report-card-body report-card-body--full">
-                <canvas
-                  id="chart-service-hourly-usage"
-                  class="report-chart-full"
-                ></canvas>
-                <p class="report-note">
-                  ※ 선 그래프: 시간대별 LLM 전체 호출 수. 스파이크 구간은
-                  서비스 과다 사용 또는 위험 구간으로 볼 수 있습니다.
-                </p>
+                <div class="service-trend-layout">
+                  <!-- 좌측: 시간대별 추이 그래프 -->
+                  <div class="service-trend-main">
+                    <canvas
+                      id="chart-service-hourly-usage"
+                      class="report-chart-full"
+                    ></canvas>
+                    <p class="report-note">
+                      ※ 선 그래프: 시간대별 LLM 전체 호출 수와 중요정보 탐지 추이.
+                      스파이크 구간은 서비스 과다 사용 또는 위험 구간으로 볼 수 있습니다.
+                    </p>
+                  </div>
+
+                  <!-- 우측: 서비스별 위험 TOP3 패널 -->
+                  <aside class="service-risk-panel">
+                    <div class="service-risk-title">서비스별 위험 TOP 3</div>
+                    <div class="service-risk-sub">
+                      중요정보 탐지 비율이 높은 서비스 순으로 정렬됩니다.
+                    </div>
+                    <ul
+                      id="service-risk-top-list"
+                      class="service-risk-list"
+                    >
+                      <li>
+                        <span class="service-risk-label">데이터 없음</span>
+                        <span class="service-risk-meta">-</span>
+                      </li>
+                    </ul>
+                    <p class="service-risk-note">
+                      * 탐지 비율 = (해당 서비스의 중요정보 탐지 건수 / 전체 호출 수)을
+                      기준으로 계산됩니다.
+                    </p>
+                  </aside>
+                </div>
               </div>
             </article>
           </div>

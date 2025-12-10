@@ -330,7 +330,7 @@ function setSelectedPc(row, trElement) {
 /** 선택된 PC에 대해 분석 API 호출 */
 async function analyzeSelectedPc() {
   if (!selectedPc || !selectedPc.pc_name) {
-    alert("먼저 탐지 건수 TOP 5에서 PC를 선택해줘.");
+    alert("먼저 탐지 건수 TOP 5에서 PC를 선택해주세요.");
     return;
   }
 
@@ -344,7 +344,7 @@ async function analyzeSelectedPc() {
     renderReasonSummary(summary);
   } catch (err) {
     console.error("reason summary error:", err);
-    alert("Reason 분석 데이터를 불러오는 중 오류가 발생했어.");
+    alert("Reason 분석 데이터를 불러오는 중 오류가 발생했습니다.");
   }
 }
 

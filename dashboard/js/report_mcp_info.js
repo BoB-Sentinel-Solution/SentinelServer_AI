@@ -6,6 +6,41 @@ let chartUsageTrend = null;
 let chartIntExt = null;
 let chartServiceUsage = null;
 
+// ★ 추가: 라벨 → 한글 매핑 (다른 파일과 동일하게)
+const MCP_LABEL_KR_MAP = {
+  NAME: "이름",
+  PHONE: "전화번호",
+  EMAIL: "이메일",
+  ADDRESS: "주소",
+  POSTAL_CODE: "우편번호",
+  PERSONAL_CUSTOMS_ID: "개인통관고유부호",
+  RESIDENT_ID: "주민등록번호",
+  PASSPORT: "여권번호",
+  DRIVER_LICENSE: "운전면허번호",
+  FOREIGNER_ID: "외국인등록번호",
+  HEALTH_INSURANCE_ID: "건보/보험번호",
+  BUSINESS_ID: "사업자등록번호",
+  JWT: "JWT 토큰",
+  API_KEY: "API 키",
+  GITHUB_PAT: "GitHub PAT",
+  PRIVATE_KEY: "개인키",
+  CARD_NUMBER: "카드번호",
+  CARD_EXPIRY: "카드유효기간",
+  CARD_CVV: "CVV",
+  BANK_ACCOUNT: "계좌번호",
+  PAYMENT_PIN: "결제 PIN",
+  MOBILE_PAYMENT_PIN: "모바일 결제 PIN",
+  PAYMENT_URI_QR: "결제 URI/QR",
+  MNEMONIC: "지갑 복구키",
+  CRYPTO_PRIVATE_KEY: "암호화폐 개인키",
+  HD_WALLET: "HD 월렛키",
+  IPV4: "IPv4",
+  IPV6: "IPv6",
+  MAC_ADDRESS: "MAC 주소",
+  IMEI: "IMEI",
+  OTHER: "기타",
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   initTopBarClock();
   hookRefreshButton();
@@ -63,6 +98,9 @@ async function loadMcpOverview() {
     renderUsageTrend(summaryMcp);
     renderInternalExternal(mcpLogs);
     renderServiceUsage(serviceCounts);
+
+    // ★ 추가: Prediction 텍스트 갱신
+    updatePredictionFromSummary(summaryMcp);
   } catch (err) {
     console.error("MCP overall report load failed:", err);
   }
@@ -350,6 +388,34 @@ function renderServiceUsage(serviceCounts) {
       },
     },
   });
+}
+
+/** ★ 추가: summaryMcp.type_ratio 기반으로 Prediction 텍스트 갱신 */
+function updatePredictionFromSummary(summaryMcp) {
+  const span = document.getElementById("mcp-pred-main-labels");
+  if (!span) return;
+
+  const typeRatio = (summaryMcp && summaryMcp.type_ratio) || {};
+  const entries = Object.entries(typeRatio).filter(
+    ([, count]) => (Number(count) || 0) > 0
+  );
+
+  if (!entries.length) {
+    span.textContent = "중요정보";
+    return;
+  }
+
+  let maxCount = 0;
+  entries.forEach(([, cnt]) => {
+    const n = Number(cnt) || 0;
+    if (n > maxCount) maxCount = n;
+  });
+
+  const topLabels = entries
+    .filter(([, cnt]) => Number(cnt) === maxCount)
+    .map(([label]) => MCP_LABEL_KR_MAP[label] || label);
+
+  span.textContent = topLabels.join(", ");
 }
 
 /** 유틸: 배열 합 */

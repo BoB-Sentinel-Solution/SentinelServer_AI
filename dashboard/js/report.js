@@ -7,11 +7,47 @@ let chartInfoTypes = null;
 let chartInfoTrendWeek = null;
 let chartInfoTrendCompare = null;
 
+// Prediction / 라벨 표시에 쓸 간단한 라벨 → 한글 매핑
+const LABEL_KR_MAP = {
+  NAME: "이름",
+  PHONE: "전화번호",
+  EMAIL: "이메일",
+  ADDRESS: "주소",
+  POSTAL_CODE: "우편번호",
+  PERSONAL_CUSTOMS_ID: "개인통관고유부호",
+  RESIDENT_ID: "주민등록번호",
+  PASSPORT: "여권번호",
+  DRIVER_LICENSE: "운전면허번호",
+  FOREIGNER_ID: "외국인등록번호",
+  HEALTH_INSURANCE_ID: "건보/보험번호",
+  BUSINESS_ID: "사업자등록번호",
+  MILITARY_ID: "군번",
+  JWT: "JWT 토큰",
+  API_KEY: "API 키",
+  GITHUB_PAT: "GitHub PAT",
+  PRIVATE_KEY: "개인키",
+  CARD_NUMBER: "카드번호",
+  CARD_EXPIRY: "카드 유효기간",
+  CARD_CVV: "CVV",
+  BANK_ACCOUNT: "계좌번호",
+  PAYMENT_PIN: "결제 PIN",
+  MOBILE_PAYMENT_PIN: "모바일 결제 PIN",
+  PAYMENT_URI_QR: "결제 URI/QR",
+  MNEMONIC: "지갑 복구키",
+  CRYPTO_PRIVATE_KEY: "암호화폐 개인키",
+  HD_WALLET: "HD 월렛키",
+  IPV4: "IPv4",
+  IPV6: "IPv6",
+  MAC_ADDRESS: "MAC 주소",
+  IMEI: "IMEI",
+  OTHER: "기타",
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   const updatedAtEl = document.getElementById("top-updated-at");
   const btnRefresh = document.getElementById("btn-refresh");
   const btnLogout = document.getElementById("btn-logout");
-  const predictionScoreEl = document.getElementById("prediction-score");
+  const predictionScoreEl = document.getElementById("prediction-score"); // 없으면 null
 
   function pad(n) {
     return n.toString().padStart(2, "0");
@@ -83,44 +119,53 @@ document.addEventListener("DOMContentLoaded", () => {
    차트 렌더링 함수들
    ========================= */
 
-// 1) 오늘 시간대별 중요정보 탐지 (라인 차트)
+// 1) 탐지된 중요정보 비율 (도넛 차트)
+//    - 중요정보 탐지 프롬프트 vs 정상 프롬프트
 function renderInfoRatio(summary) {
   const ctx = document.getElementById("chart-info-ratio");
   if (!ctx) return;
 
-  const todayHourly = summary.today_hourly || [];
-  const labels = Array.from({ length: 24 }, (_, i) => `${i}시`);
-  const data = labels.map((_, i) => todayHourly[i] || 0);
+  const totalSensitive = Number(summary.total_sensitive || 0);
+  const hourlyAttempts = summary.hourly_attempts || [];
+  const totalRequests = sumArray(hourlyAttempts);
+  const normalCount = Math.max(totalRequests - totalSensitive, 0);
+
+  const labels = ["중요정보 탐지 프롬프트", "정상 프롬프트"];
+  const data = [totalSensitive, normalCount];
 
   if (chartInfoRatio) chartInfoRatio.destroy();
 
-  chartInfoRatio = new Chart(ctx, {
-    type: "line",
+  const chartCtx = ctx.getContext("2d");
+  chartInfoRatio = new Chart(chartCtx, {
+    type: "doughnut",
     data: {
       labels,
       datasets: [
         {
-          label: "시간대별 탐지 건수",
           data,
-          fill: false,
-          tension: 0.3,
+          borderWidth: 1,
         },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { precision: 0 },
-        },
-      },
+      cutout: "55%",
       plugins: {
-        legend: { display: false },
+        legend: {
+          position: "bottom",
+        },
         tooltip: {
           callbacks: {
-            label: (ctx) => `탐지 ${ctx.parsed.y}건`,
+            label: (tooltipItem) => {
+              const label = tooltipItem.label || "";
+              const value = tooltipItem.parsed || 0;
+              if (totalRequests > 0) {
+                const pct = ((value / totalRequests) * 100).toFixed(1);
+                return `${label}: ${value}건 (${pct}%)`;
+              }
+              return `${label}: ${value}건`;
+            },
           },
         },
       },
@@ -319,8 +364,28 @@ function renderInfoTrendCompare(summary) {
   });
 }
 
-// 6) Prediction 점수 계산 (간단한 휴리스틱)
+// 6) Prediction 표시
+//   - prediction-score 가 있으면 기존 점수 계산 유지
+//   - llm-pred-main-labels 에는 가장 많이 탐지된 라벨(동률이면 여러 개) 한글로 출력
 function renderPrediction(summary, scoreEl) {
+  // (1) 최다 탐지 라벨 → PREDICTION 문구에 반영
+  const labelSpan = document.getElementById("llm-pred-main-labels");
+  if (labelSpan) {
+    const typeRatio = summary.type_ratio || {};
+    const entries = Object.entries(typeRatio).filter(([, v]) => (v || 0) > 0);
+    if (entries.length === 0) {
+      labelSpan.textContent = "중요정보";
+    } else {
+      entries.sort((a, b) => b[1] - a[1]);
+      const maxCount = entries[0][1];
+      const topLabels = entries
+        .filter(([, v]) => v === maxCount)
+        .map(([lab]) => LABEL_KR_MAP[lab] || lab);
+      labelSpan.textContent = topLabels.join(", ");
+    }
+  }
+
+  // (2) 점수 표시 부분은 기존 로직 유지 (엘리먼트 없으면 그냥 스킵)
   if (!scoreEl) return;
 
   const total = summary.total_sensitive || 0;
@@ -331,9 +396,17 @@ function renderPrediction(summary, scoreEl) {
     score = 0;
   } else {
     // 오늘 비중을 기반으로 간단한 위험 점수 계산
-    const ratio = today / total;        // 0 ~ 1
+    const ratio = today / total; // 0 ~ 1
     score = Math.round(Math.min(100, ratio * 120 + today * 2));
   }
 
   scoreEl.textContent = String(score);
+}
+
+/* =========================
+   유틸 함수
+   ========================= */
+
+function sumArray(arr) {
+  return (arr || []).reduce((acc, v) => acc + (Number(v) || 0), 0);
 }

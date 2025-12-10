@@ -67,6 +67,16 @@
           flex-direction: column;
         }
       }
+      .report-row--trend {
+      display: block !important;
+      }
+
+      .report-row--trend > .card {
+      width: 100% !important;
+      max-width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      }
     </style>
   </head>
   <body class="sentinel-body">
@@ -197,7 +207,7 @@
           </div>
 
           <!-- 하단 카드 : 시간대 추이 + 서비스별 위험 TOP3 -->
-          <div class="report-row">
+          <div class="report-row report-row--trend">
             <article class="card report-card-full">
               <header class="card-header report-card-header-full">
                 <div>

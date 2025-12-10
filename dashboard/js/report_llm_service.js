@@ -273,13 +273,13 @@ function renderServiceRiskLevel(summary, el) {
   const total = summary.total_sensitive || 0;
   const today = summary.today_sensitive || 0;
 
-  let level = "없음";
-  if (total > 0) {
-    const ratio = today / total;
-    if (today >= 10 || ratio > 0.4) level = "강함";
-    else if (today >= 3 || ratio > 0.15) level = "보통";
-    else if (today > 0) level = "낮음";
-  }
+  let level = "";
+  // if (total > 0) {
+  //   const ratio = today / total;
+  //   if (today >= 10 || ratio > 0.4) level = "강함";
+  //   else if (today >= 3 || ratio > 0.15) level = "보통";
+  //   else if (today > 0) level = "낮음";
+  // }
   el.textContent = level;
 
   // ----- 우측 "서비스별 위험 TOP 3" 리스트 업데이트 -----

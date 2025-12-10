@@ -77,7 +77,7 @@
               </a>
             </div>
 
-            <!-- FILE BASED (현재 페이지) -->
+            <!-- FILE BASED -->
             <div class="side-group">
               <div class="side-group-title">| FILE BASED</div>
               <a class="side-link" href="./report_llm_file.html">
@@ -101,18 +101,20 @@
             <article class="card report-card">
               <header class="card-header">
                 <h3 class="card-title">탐지된 중요정보 비율</h3>
-                <span class="card-subtitle">전체 탐지 중 중요정보 비중</span>
+                <span class="card-subtitle">
+                  전체 LLM 프롬프트 중 중요정보 탐지 프롬프트 비율
+                </span>
               </header>
-              <div class="report-card-body">
-                <canvas id="chart-info-ratio" class="report-chart"></canvas>
+              <div class="report-card-body report-card-body--center">
+                <canvas id="chart-info-ratio" class="report-chart-donut"></canvas>
               </div>
             </article>
 
             <!-- 카드 2: 중요정보 탐지 통계 -->
-            <article class="card report-card">
+            <article class="card report-card" id="stats">
               <header class="card-header">
                 <h3 class="card-title">중요정보 탐지 통계</h3>
-                <span class="card-subtitle">중요정보 탐지 횟수 및 추이</span>
+                <span class="card-subtitle">중요정보 탐지 횟수 상위 유형</span>
               </header>
               <div class="report-card-body">
                 <canvas id="chart-info-stats" class="report-chart"></canvas>
@@ -123,7 +125,7 @@
             <article class="card report-card">
               <header class="card-header">
                 <h3 class="card-title">중요정보 탐지 유형 분류</h3>
-                <span class="card-subtitle">LABEL 기준 TOP 유형</span>
+                <span class="card-subtitle">LABEL 기준 TOP 유형 분포</span>
               </header>
               <div class="report-card-body report-card-body--center">
                 <canvas id="chart-info-types" class="report-chart-donut"></canvas>
@@ -132,45 +134,43 @@
           </div>
 
           <!-- 하단 3장 (한 줄, 동일 높이) -->
-          <div class="report-grid report-grid-bottom">
+          <div class="report-grid report-grid-bottom" id="trend">
             <!-- 시간대 별 사용 횟수 -->
             <article class="card report-card">
               <header class="card-header">
                 <h3 class="card-title">시간대 별 사용 횟수</h3>
-                <span class="card-subtitle">최근 7일 사용 횟수</span>
+                <span class="card-subtitle">최근 24시간 기준 LLM 호출 수</span>
               </header>
               <div class="report-card-body">
                 <canvas id="chart-info-trend-week" class="report-chart"></canvas>
               </div>
             </article>
 
-            <!-- 카드 5: 지난 7일 중요정보 탐지 비율 -->
+            <!-- 카드 5: 시간대 별 중요정보 탐지 비율 -->
             <article class="card report-card">
               <header class="card-header">
                 <h3 class="card-title">시간대 별 중요정보 탐지 비율</h3>
-                <span class="card-subtitle">지난 7일 중요정보 탐지 비율</span>
+                <span class="card-subtitle">
+                  시간대별 전체 호출 대비 중요정보 탐지 비율
+                </span>
               </header>
               <div class="report-card-body">
                 <canvas id="chart-info-trend-compare" class="report-chart"></canvas>
               </div>
             </article>
 
-            <!-- 카드 6: Prediction 카드 --> 
+            <!-- 카드 6: Prediction 카드 -->
             <article class="card report-card report-card-prediction">
               <header class="card-header">
                 <h3 class="card-title">PREDICTION</h3>
               </header>
               <div class="report-card-body report-card-body--prediction">
-                <!-- <p class="prediction-label">오늘의 위험 지수</p>
-                <div class="prediction-score-wrapper">
-                  <span id="prediction-score" class="prediction-score">-</span>
-                  <span class="prediction-score-unit">/ 100</span>
-                </div> -->
-
                 <p class="prediction-text">
-                  최근 7일간 LLM 서비스에서 <strong>전화번호</strong>가 반복적으로 탐지되고 있습니다.
-                  이 패턴이 유지될 경우, <strong>다음 주</strong>에 유사한 노출 위험이
-                  다시 발생할 가능성이 높습니다.
+                  최근 7일간 LLM 서비스에서
+                  <strong id="llm-pred-main-labels">중요정보</strong>가
+                  반복적으로 탐지되고 있습니다.
+                  이 패턴이 유지될 경우, <strong>향후 유사 기간</strong>에
+                  유사한 노출 위험이 다시 발생할 가능성이 높습니다.
                 </p>
 
                 <ul class="prediction-bullets">
@@ -184,7 +184,6 @@
       </section>
     </main>
 
-    <!-- 스크립트: 나중에 report.js 에서 차트 렌더링 -->
     <script src="./vendor/chart.umd.min.js"></script>
     <script src="./js/api.js"></script>
     <script src="./js/report.js"></script>

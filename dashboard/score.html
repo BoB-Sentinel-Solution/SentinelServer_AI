@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sentinel · 오늘의 위험 지수</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link rel="stylesheet" href="./vendor/reset.min.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+
+    <!-- Score 페이지 전용 스타일 -->
+    <style>
+      /* 전체 레이아웃 */
+      .score-layout {
+        max-width: 1440px;
+        margin: 24px auto 40px;
+        padding: 0 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .score-row {
+        display: flex;
+        gap: 20px;
+      }
+
+      .score-row--full {
+        flex-direction: column;
+      }
+
+      .score-card {
+        flex: 1 1 0;
+      }
+
+      .score-card-hero {
+        flex: 2 1 0;
+      }
+
+      .score-card-side {
+        flex: 1.2 1 0;
+      }
+
+      .score-card--wide {
+        width: 100%;
+      }
+
+      @media (max-width: 1100px) {
+        .score-row {
+          flex-direction: column;
+        }
+        .score-card-hero,
+        .score-card-side {
+          flex: 1 1 100%;
+        }
+      }
+
+      /* 오늘의 위험 지수 히어로 영역 */
+      .score-hero-body {
+        display: flex;
+        gap: 20px;
+        align-items: stretch;
+      }
+
+      .score-hero-main {
+        flex: 1.3 1 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .score-hero-value-wrap {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+
+      .score-hero-value {
+        font-size: 48px;
+        font-weight: 800;
+        color: #1b2340;
+      }
+
+      .score-hero-unit {
+        font-size: 16px;
+        color: #79809a;
+      }
+
+      .score-hero-level-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 4px;
+      }
+
+      .score-level-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #eef0f8;
+        color: #333a55;
+      }
+
+      .score-level-text {
+        font-size: 12px;
+        color: #555b71;
+      }
+
+      .score-hero-desc {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #8b90a5;
+      }
+
+      .score-hero-meta {
+        flex: 1 1 0;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        padding: 10px 12px;
+        background: #f7f9ff;
+        border-radius: 12px;
+      }
+
+      .score-meta-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .score-meta-label {
+        font-size: 11px;
+        color: #7a8199;
+      }
+
+      .score-meta-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1b2340;
+      }
+
+      @media (max-width: 768px) {
+        .score-hero-body {
+          flex-direction: column;
+        }
+        .score-hero-meta {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      /* 위험 지수 구성 요소 카드 */
+      .score-components-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 4px 0 4px;
+      }
+
+      .score-component {
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: #f7f8fd;
+      }
+
+      .score-component-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+
+      .score-component-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #2b3150;
+      }
+
+      .score-component-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1b2340;
+      }
+
+      .score-component-desc {
+        font-size: 11px;
+        color: #6f7690;
+        margin-bottom: 2px;
+      }
+
+      .score-component-formula {
+        font-size: 11px;
+        color: #9aa1bc;
+        font-family: "SFMono-Regular", ui-monospace, SFMono, Menlo, Monaco,
+          Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+
+      /* 공통 테이블 스타일 */
+      .score-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 12px;
+      }
+
+      .score-table thead {
+        background: #f5f7fd;
+      }
+
+      .score-table th,
+      .score-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #edf0fb;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .score-table th {
+        font-weight: 700;
+        color: #1b2340;
+      }
+
+      .score-table tbody tr:nth-child(even) td {
+        background: #fafbff;
+      }
+
+      .score-table tbody tr:hover td {
+        background: #eef3ff;
+      }
+
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      /* 하단 주석 */
+      .score-footnote {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #8b90a5;
+      }
+
+      /* 위험 등급별 색상은 JS에서 클래스 추가로 제어할 수도 있지만
+         기본 배지는 styles.js / JS 에서 직접 색상 클래스를 붙여서 사용할 예정 */
+      .score-level-badge--blue {
+        background: #e3f1ff;
+        color: #1459a5;
+      }
+      .score-level-badge--green {
+        background: #e2f6ec;
+        color: #137b45;
+      }
+      .score-level-badge--yellow {
+        background: #fff7dd;
+        color: #a87405;
+      }
+      .score-level-badge--orange {
+        background: #ffe8d9;
+        color: #c35212;
+      }
+      .score-level-badge--red {
+        background: #ffe1e1;
+        color: #b3261e;
+      }
+    </style>
+  </head>
+
+  <body class="sentinel-body score-page">
+    <!-- 상단 네비게이션 바 -->
+    <header class="top-nav">
+      <div class="top-nav-left">
+        <div class="top-logo">
+          <span class="top-logo-main">SENTINEL</span>
+          <span class="top-logo-sub">DASHBOARD</span>
+        </div>
+
+        <nav class="top-menu">
+          <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+          <a class="top-menu-item" href="./report.html">Report</a>
+          <a class="top-menu-item" href="./logs.html">Logs</a>
+          <a class="top-menu-item" href="./reason.html">Reason</a>
+          <a class="top-menu-item" href="./network.html">Network</a>
+          <a class="top-menu-item top-menu-item--active" href="./score.html">Score</a>
+          <a class="top-menu-item" href="./settings.html">Settings</a>
+        </nav>
+      </div>
+
+      <div class="top-nav-right">
+        <span class="top-updated-label">UPDATED:</span>
+        <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+        <button id="btn-refresh" class="btn btn-small">Refresh</button>
+        <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <!-- 메인 컨텐츠 -->
+    <main class="score-layout">
+      <!-- 1행: 오늘의 위험 지수 + 요약 메트릭 -->
+      <section class="score-row">
+        <!-- 히어로 카드: 오늘의 위험 지수 -->
+        <article class="card score-card score-card-hero">
+          <header class="card-header">
+            <h3 class="card-title">오늘의 위험 지수</h3>
+            <span class="card-subtitle">LLM / MCP 전체 프롬프트 기준</span>
+          </header>
+
+          <div class="score-hero-body">
+            <div class="score-hero-main">
+              <div class="score-hero-value-wrap">
+                <span id="risk-score-value" class="score-hero-value">--</span>
+                <span class="score-hero-unit">/ 100</span>
+              </div>
+
+              <div class="score-hero-level-wrap">
+                <span id="risk-score-level-badge" class="score-level-badge">
+                  -
+                </span>
+                <span id="risk-score-level-text" class="score-level-text">
+                  위험 등급 계산 중...
+                </span>
+              </div>
+
+              <p id="risk-score-description" class="score-hero-desc">
+                오늘 수집된 로그를 기반으로 위험 지수를 계산합니다.
+              </p>
+            </div>
+
+            <div class="score-hero-meta">
+              <div class="score-meta-item">
+                <span class="score-meta-label">오늘 탐지 건수</span>
+                <span id="score-today-sensitive" class="score-meta-value">-</span>
+              </div>
+              <div class="score-meta-item">
+                <span class="score-meta-label">최근 7일 일 평균 탐지</span>
+                <span id="score-avg7d-sensitive" class="score-meta-value">-</span>
+              </div>
+              <div class="score-meta-item">
+                <span class="score-meta-label">오늘 전체 프롬프트 수</span>
+                <span id="score-today-total" class="score-meta-value">-</span>
+              </div>
+              <div class="score-meta-item">
+                <span class="score-meta-label">오늘 탐지 비율</span>
+                <span id="score-today-ratio" class="score-meta-value">-</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- 오른쪽: 스코어 구성 요약 -->
+        <article class="card score-card score-card-side">
+          <header class="card-header">
+            <h3 class="card-title">위험 지수 구성 요소</h3>
+            <span class="card-subtitle">Score₁ + Score₂ = 최종 Risk Score</span>
+          </header>
+
+          <div class="score-components-body">
+            <div class="score-component">
+              <div class="score-component-header">
+                <span class="score-component-title">Score₁ · 오늘 vs 7일 평균</span>
+                <span id="score-part1-value" class="score-component-value">-</span>
+              </div>
+              <p class="score-component-desc">
+                오늘 탐지 건수가 최근 7일 일 평균 탐지 건수에 비해 얼마나 증가했는지 반영합니다.
+              </p>
+              <p class="score-component-formula">
+                R = T_today / max(T_avg7d, 1), Score₁ = min(50, R × 25)
+              </p>
+            </div>
+
+            <div class="score-component">
+              <div class="score-component-header">
+                <span class="score-component-title">Score₂ · 오늘 탐지 비율</span>
+                <span id="score-part2-value" class="score-component-value">-</span>
+              </div>
+              <p class="score-component-desc">
+                오늘 전체 프롬프트 중 중요정보가 탐지된 비율을 반영합니다.
+              </p>
+              <p class="score-component-formula">
+                r = T_today / max(T_total_today, 1), Score₂ = min(50, r × 100)
+              </p>
+            </div>
+
+            <div class="score-component">
+              <div class="score-component-header">
+                <span class="score-component-title">최종 Risk Score</span>
+                <span id="score-final-value" class="score-component-value">-</span>
+              </div>
+              <p class="score-component-desc">
+                Risk Score = min(100, Score₁ + Score₂) 로 계산되며, 등급별로 색상과 메시지가 달라집니다.
+              </p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- 2행: 최근 7일 추이 차트 -->
+      <section class="score-row">
+        <!-- 위험 지수 7일 추이 -->
+        <article class="card score-card">
+          <header class="card-header">
+            <h3 class="card-title">최근 7일 위험 지수 추이</h3>
+            <span class="card-subtitle">
+              일자별 Risk Score 변화를 통해 장기적인 위험 패턴을 확인합니다.
+            </span>
+          </header>
+          <div class="card-body">
+            <canvas id="score-chart-7d-risk" height="200"></canvas>
+          </div>
+        </article>
+
+        <!-- 최근 7일 탐지 / 전체 요청 추이 -->
+        <article class="card score-card">
+          <header class="card-header">
+            <h3 class="card-title">최근 7일 탐지·사용량 추이</h3>
+            <span class="card-subtitle">
+              일자별 전체 프롬프트 수와 중요정보 탐지 건수를 함께 비교합니다.
+            </span>
+          </header>
+          <div class="card-body">
+            <canvas id="score-chart-7d-traffic" height="200"></canvas>
+          </div>
+        </article>
+      </section>
+
+      <!-- 3행: 오늘 위험 기여 Top 서비스 / 라벨 -->
+      <section class="score-row">
+        <!-- 서비스 / 호스트 Top -->
+        <article class="card score-card">
+          <header class="card-header">
+            <h3 class="card-title">오늘 위험 기여 Top 서비스·PC</h3>
+            <span class="card-subtitle">
+              오늘 위험 지수에 가장 많이 기여한 Host / PC 기준 상위 목록입니다.
+            </span>
+          </header>
+          <div class="card-body">
+            <table class="score-table">
+              <thead>
+                <tr>
+                  <th>순위</th>
+                  <th>Host</th>
+                  <th>PC Name</th>
+                  <th>오늘 탐지 건수</th>
+                  <th>전체 요청 대비 비율</th>
+                </tr>
+              </thead>
+              <tbody id="score-top-hosts-body">
+                <tr>
+                  <td colspan="5">데이터를 불러오는 중...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <!-- 라벨 Top -->
+        <article class="card score-card">
+          <header class="card-header">
+            <h3 class="card-title">오늘 많이 탐지된 중요정보 유형</h3>
+            <span class="card-subtitle">
+              오늘 탐지된 중요정보 LABEL 기준 상위 유형입니다.
+            </span>
+          </header>
+          <div class="card-body">
+            <table class="score-table">
+              <thead>
+                <tr>
+                  <th>순위</th>
+                  <th>LABEL</th>
+                  <th>탐지 건수</th>
+                  <th>설명</th>
+                </tr>
+              </thead>
+              <tbody id="score-top-labels-body">
+                <tr>
+                  <td colspan="4">데이터를 불러오는 중...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <!-- 4행: 오늘 고위험 이벤트 타임라인 -->
+      <section class="score-row score-row--full">
+        <article class="card score-card score-card--wide">
+          <header class="card-header">
+            <h3 class="card-title">오늘 고위험 이벤트 타임라인</h3>
+            <span class="card-subtitle">
+              차단·파일 유사 차단·다수 라벨 동시 탐지 등 고위험으로 분류된 이벤트를 시간 순서대로 보여줍니다.
+            </span>
+          </header>
+
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table class="score-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Host</th>
+                    <th>PC Name</th>
+                    <th>Public IP</th>
+                    <th>Action</th>
+                    <th>Detected Labels</th>
+                    <th>Note</th>
+                  </tr>
+                </thead>
+                <tbody id="score-high-risk-logs-body">
+                  <tr>
+                    <td colspan="7">오늘 고위험 이벤트가 아직 없습니다.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="score-footnote">
+              * 고위험 이벤트 기준은 정책에 따라 조정할 수 있습니다
+              (예: 차단 발생, 동일 세션 다수 라벨 탐지, 특정 LABEL 포함 등).
+            </p>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <!-- 스크립트 -->
+    <script src="./vendor/chart.umd.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/score.js"></script>
+  </body>
+</html>

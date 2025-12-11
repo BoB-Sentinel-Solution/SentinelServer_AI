@@ -351,11 +351,11 @@ async function analyzeSelectedPc() {
     if (!btn.dataset.originalText) {
       btn.dataset.originalText = btn.textContent || "분석하기";
     }
-    btn.textContent = "분석 중…";
+    btn.textContent = "분석 중";
   }
 
   if (statusEl) {
-    statusEl.textContent = "분석 중입니다. 잠시만 기다려 주세요…";
+    statusEl.textContent = "분석 중입니다. 잠시만 기다려 주세요.";
   }
 
   try {

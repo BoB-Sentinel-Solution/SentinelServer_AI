@@ -201,7 +201,6 @@
       /* 공통 테이블 스타일 */
       .score-table {
         width: 100%;
-        min-width: 1100px;
         border-collapse: collapse;
         table-layout: fixed;
         font-size: 12px;
@@ -219,6 +218,13 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+
+      /* 오늘 고위험 이벤트 타임라인 테이블의 Note 열만 전체 텍스트 표시 */
+      .score-table-wrapper .score-table td:nth-child(7) {
+        white-space: normal;      /* 줄바꿈 허용 */
+        overflow: visible;
+        text-overflow: unset;
       }
 
       .score-table th {

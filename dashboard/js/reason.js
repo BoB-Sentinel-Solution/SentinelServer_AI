@@ -127,6 +127,8 @@ let selectedPc = null; // { pc_name, host, public_ip, private_ip }
 let carouselItems = []; // 위험 콤보가 탐지된 프롬프트 목록
 let carouselIndex = 0;
 
+let isAnalyzing = false;
+
 // ===== 초기화 =====
 document.addEventListener("DOMContentLoaded", () => {
   initTopBarClock();
@@ -334,6 +336,28 @@ async function analyzeSelectedPc() {
     return;
   }
 
+  // 이미 분석 중이면 추가 호출 막기
+  if (isAnalyzing) return;
+  isAnalyzing = true;
+
+  const btn = document.getElementById("btn-reason-analyze");
+  const statusEl = document.getElementById("reason-status");
+
+  // 버튼 잠그고 텍스트/로딩 상태 표시
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add("is-loading");
+
+    if (!btn.dataset.originalText) {
+      btn.dataset.originalText = btn.textContent || "분석하기";
+    }
+    btn.textContent = "분석 중…";
+  }
+
+  if (statusEl) {
+    statusEl.textContent = "분석 중입니다. 잠시만 기다려 주세요…";
+  }
+
   try {
     const summary = await SentinelApi.fetchReasonSummary({
       pc_name: selectedPc.pc_name,
@@ -345,6 +369,19 @@ async function analyzeSelectedPc() {
   } catch (err) {
     console.error("reason summary error:", err);
     alert("Reason 분석 데이터를 불러오는 중 오류가 발생했습니다.");
+  } finally {
+    // 상태 복원
+    isAnalyzing = false;
+
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove("is-loading");
+      btn.textContent = btn.dataset.originalText || "분석하기";
+    }
+
+    if (statusEl) {
+      statusEl.textContent = "";
+    }
   }
 }
 

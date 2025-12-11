@@ -398,6 +398,34 @@
           grid-area: left;
         }
       }
+
+      /* ----- Reason 분석 버튼 로딩 상태 ----- */
+      .reason-page #btn-reason-analyze[disabled] {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .reason-page .btn.is-loading {
+        position: relative;
+      }
+
+      .reason-page .btn.is-loading::after {
+        content: "…";
+        margin-left: 4px;
+        animation: reason-blink 1s infinite;
+      }
+
+      @keyframes reason-blink {
+        0%, 100% { opacity: 0; }
+        50%      { opacity: 1; }
+      }
+
+      .reason-page .reason-status {
+        margin-left: 8px;
+        font-size: 11px;
+        color: #6b7083;
+      }
+
     </style>
   </head>
 
@@ -475,6 +503,8 @@
                 <button id="btn-reason-analyze" class="btn btn-small">
                   분석하기
                 </button>
+                <!-- 분석 중 상태 표시 -->
+                <span id="reason-status" class="reason-status"></span>
               </div>
             </div>
           </div>

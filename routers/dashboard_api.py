@@ -592,7 +592,7 @@ def list_logs(
 
     쿼리 파라미터:
     - page: 페이지 번호(1부터)
-    - page_size: 페이지 크기 (최대 100)
+    - page_size: 페이지 크기 (최대 500)
     - q: 검색 키워드
     - category: 검색 대상 컬럼
       - prompt | host | pc_name | public_ip | private_ip | entity
@@ -601,8 +601,8 @@ def list_logs(
         page = 1
     if page_size < 1:
         page_size = 20
-    if page_size > 100:
-        page_size = 100
+    if page_size > 500:
+        page_size = 500
 
     query = db.query(LogRecord)
 

@@ -13,9 +13,8 @@ from db import get_db
 from models import AdminAccountRecord
 
 logger = logging.getLogger(__name__)
-router = APIRouter(tags=["auth"])
+router = APIRouter(tags=["auth"])  # ✅ app.include_router(..., prefix="/api") 쓰는 스타일 유지
 
-ADMIN_KEY_ENV = os.environ.get("ADMIN_KEY", "").strip()  # (선택) 긴급 우회키
 
 # ---- password hashing (PBKDF2) ----
 def _b64(b: bytes) -> str:
@@ -46,17 +45,27 @@ def verify_password(stored: str, pw: str) -> bool:
 def new_api_key() -> str:
     return secrets.token_urlsafe(48)
 
+def _admin_bypass_key() -> str:
+    # ✅ 런타임에서 읽기 (환경변수 핫스왑 가능)
+    return os.environ.get("ADMIN_KEY", "").strip()
+
 def _get_or_create_admin(db: Session) -> AdminAccountRecord:
     rec = db.get(AdminAccountRecord, 1)
     if rec:
         return rec
 
-    # 최초 부팅 시 계정 생성: env 있으면 그걸로, 없으면 랜덤 PW 생성(로그에 출력)
+    # 최초 부팅 시 계정 생성
     username = os.environ.get("ADMIN_ID", "").strip() or "admin"
     password = os.environ.get("ADMIN_PW", "").strip()
+
     if not password:
+        # 운영 안전: 기본은 비번을 로그에 직접 출력하지 않음.
+        # 정말 필요하면 AUTH_PRINT_INIT_PW=1 로만 출력되게.
         password = secrets.token_urlsafe(16)
-        logger.warning("[AUTH] Initial admin password generated: %s", password)
+        if os.environ.get("AUTH_PRINT_INIT_PW", "").strip() == "1":
+            logger.warning("[AUTH] Initial admin password generated: %s", password)
+        else:
+            logger.warning("[AUTH] Initial admin password generated (hidden). Set ADMIN_PW or AUTH_PRINT_INIT_PW=1 for dev.")
 
     rec = AdminAccountRecord(
         id=1,
@@ -67,8 +76,7 @@ def _get_or_create_admin(db: Session) -> AdminAccountRecord:
         updated_at=datetime.now(),
     )
     db.add(rec)
-    db.commit()
-    db.refresh(rec)
+    db.flush()   # ✅ get_db()가 commit하므로 여기선 flush만
     return rec
 
 def require_admin(
@@ -76,13 +84,15 @@ def require_admin(
     x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
 ) -> AdminAccountRecord:
     # (선택) 운영 긴급 우회키
-    if ADMIN_KEY_ENV and x_admin_key == ADMIN_KEY_ENV:
+    bypass = _admin_bypass_key()
+    if bypass and x_admin_key == bypass:
         return _get_or_create_admin(db)
 
     rec = _get_or_create_admin(db)
     if not x_admin_key or x_admin_key != rec.api_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin key")
     return rec
+
 
 # ---- Schemas ----
 class LoginIn(BaseModel):
@@ -105,6 +115,7 @@ class ChangeOut(BaseModel):
     version: int
     updated_at: str
 
+
 @router.post("/auth/login", response_model=LoginOut)
 def login(body: LoginIn, db: Session = Depends(get_db)) -> LoginOut:
     rec = _get_or_create_admin(db)
@@ -112,13 +123,20 @@ def login(body: LoginIn, db: Session = Depends(get_db)) -> LoginOut:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username/password")
 
     # 로그인 성공 시에도 키 회전하고 싶으면 아래 주석 해제
-    # rec.api_key = new_api_key(); rec.version += 1; rec.updated_at = datetime.now(); db.add(rec); db.commit(); db.refresh(rec)
+    # rec.api_key = new_api_key()
+    # rec.version = int(rec.version or 1) + 1
+    # rec.updated_at = datetime.now()
+    # db.add(rec); db.flush()
 
     return LoginOut(api_key=rec.api_key, username=rec.username)
 
 @router.get("/auth/me")
 def me(rec: AdminAccountRecord = Depends(require_admin)):
-    return {"username": rec.username, "updated_at": rec.updated_at.isoformat(), "version": int(rec.version or 1)}
+    return {
+        "username": rec.username,
+        "updated_at": rec.updated_at.isoformat() if rec.updated_at else None,
+        "version": int(rec.version or 1),
+    }
 
 @router.put("/auth/id", response_model=ChangeOut)
 def change_id(
@@ -126,13 +144,16 @@ def change_id(
     db: Session = Depends(get_db),
     rec: AdminAccountRecord = Depends(require_admin),
 ) -> ChangeOut:
-    rec.username = body.new_username.strip()
+    u = body.new_username.strip()
+    if not u:
+        raise HTTPException(status_code=400, detail="new_username cannot be blank")
+
+    rec.username = u
     rec.api_key = new_api_key()  # ✅ 변경 즉시 기존 세션 키 무효화
     rec.version = int(rec.version or 1) + 1
     rec.updated_at = datetime.now()
     db.add(rec)
-    db.commit()
-    db.refresh(rec)
+    db.flush()
 
     return ChangeOut(
         api_key=rec.api_key,
@@ -152,8 +173,7 @@ def change_password(
     rec.version = int(rec.version or 1) + 1
     rec.updated_at = datetime.now()
     db.add(rec)
-    db.commit()
-    db.refresh(rec)
+    db.flush()
 
     return ChangeOut(
         api_key=rec.api_key,

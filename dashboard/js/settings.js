@@ -61,7 +61,7 @@
   function loadUiTheme() {
     const saved = (localStorage.getItem("sentinel_theme") || "light");
     writeRadio("ui_theme", saved);
-    document.documentElement.dataset.theme = saved; // CSS에서 [data-theme="dark"] 같은 식으로 쓰기 좋음
+    document.documentElement.dataset.theme = saved;
   }
 
   function saveUiTheme() {
@@ -70,12 +70,35 @@
     document.documentElement.dataset.theme = t;
   }
 
+  function setCheck(id, v) {
+    const el = document.getElementById(id);
+    if (el) el.checked = !!v;
+  }
+  function getCheck(id) {
+    const el = document.getElementById(id);
+    return !!(el && el.checked);
+  }
+
+  // =========================
+  // 서버 설정 구조에 맞춰 적용
+  // =========================
+  // 서버(db_logging.py)가 기대:
+  // config = {
+  //   response_method: "mask" | "allow" | "block",
+  //   service_filters: {
+  //     llm: { gpt, gemini, claude, deepseek, groq },
+  //     mcp: { gpt_desktop, claude_desktop, vscode_copilot }
+  //   }
+  // }
   function applySettingsToUI(payload) {
     const cfg = payload?.config || {};
-    const services = cfg.services || {};
-    const llm = services.llm || {};
-    const mcp = services.mcp || {};
 
+    // ✅ 서버키: service_filters
+    const sf = cfg.service_filters || {};
+    const llm = sf.llm || {};
+    const mcp = sf.mcp || {};
+
+    // response_method
     writeRadio("response_method", cfg.response_method || "mask");
 
     // LLM
@@ -88,16 +111,8 @@
     // MCP
     setCheck("mcp-gpt-desktop", !!mcp.gpt_desktop);
     setCheck("mcp-claude-desktop", !!mcp.claude_desktop);
-    setCheck("mcp-vscode", !!mcp.vscode);
-  }
-
-  function setCheck(id, v) {
-    const el = document.getElementById(id);
-    if (el) el.checked = !!v;
-  }
-  function getCheck(id) {
-    const el = document.getElementById(id);
-    return !!(el && el.checked);
+    // ✅ 서버키: vscode_copilot (UI id는 mcp-vscode 그대로)
+    setCheck("mcp-vscode", !!mcp.vscode_copilot);
   }
 
   function collectSettingsFromUI(currentVersion) {
@@ -105,7 +120,8 @@
 
     const config = {
       response_method,
-      services: {
+      // ✅ 서버키: service_filters
+      service_filters: {
         llm: {
           gpt: getCheck("llm-gpt"),
           gemini: getCheck("llm-gemini"),
@@ -116,7 +132,8 @@
         mcp: {
           gpt_desktop: getCheck("mcp-gpt-desktop"),
           claude_desktop: getCheck("mcp-claude-desktop"),
-          vscode: getCheck("mcp-vscode"),
+          // ✅ 서버키: vscode_copilot
+          vscode_copilot: getCheck("mcp-vscode"),
         }
       }
     };
@@ -135,7 +152,7 @@
   }
 
   async function onSave() {
-    saveUiTheme(); // UI는 로컬 저장
+    saveUiTheme(); // UI만 로컬 저장
 
     const body = collectSettingsFromUI(serverVersion);
     const saved = await apiPut("/settings", body);

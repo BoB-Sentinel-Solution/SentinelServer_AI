@@ -72,30 +72,26 @@ def _load_settings_config(db: Session) -> Dict[str, Any]:
 
 
 def _is_monitored_by_settings(cfg: Dict[str, Any], interface: str, host: str) -> bool:
-    """
-    설정된 서비스가 켜져 있으면 해당 서비스(host substring)만 모니터링.
-    - 대소문자 무시
-    - service_filters가 없으면: 모니터링 ON
-    - 해당 interface에서 enable이 하나도 없으면: 모니터링 ON(설정 미완성 방어)
-    """
     itf = (interface or "llm").strip().lower()
     h = (host or "").strip().lower()
 
+    # ✅ 세팅 미적용(기본): 전부 ON
     sf = cfg.get("service_filters") if isinstance(cfg, dict) else None
     if not isinstance(sf, dict):
         return True
 
     enabled = sf.get(itf)
     if not isinstance(enabled, dict):
-        return True
+        # service_filters는 있는데 이 interface 설정이 없으면 "선택 안 함"으로 간주 → OFF 권장
+        return False
 
-    # enable된 항목이 하나도 없으면 “필터 미적용(전부 모니터링)”으로 간주
+    # ✅ 전부 체크 해제면 “전부 모니터링 OFF”
     if not any(bool(v) for v in enabled.values()):
-        return True
+        return False
 
     mapping = LLM_HOST_MAP if itf == "llm" else (MCP_HOST_MAP if itf == "mcp" else None)
     if mapping is None:
-        return True
+        return True  # 모르는 interface는 기존처럼 ON (원하면 False로 바꿔도 됨)
 
     for key, substr in mapping.items():
         if enabled.get(key) and substr in h:

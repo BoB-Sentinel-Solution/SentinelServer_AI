@@ -9,6 +9,7 @@ from sqlalchemy import Column, String, Boolean, Integer, DateTime, JSON, Text
 from sqlalchemy.sql import func
 from db import Base
 from datetime import datetime
+import secrets
 
 
 class LogRecord(Base):
@@ -137,3 +138,18 @@ class SettingsRecord(Base):
         """
         self.config_json = cfg or {}
         self.updated_at = datetime.now()
+
+class AdminAccountRecord(Base):
+    """
+    관리자 로그인 계정(단일 레코드 id=1)
+    - username / password_hash 로 로그인
+    - api_key: 로그인 세션 키(프론트 localStorage에 저장되는 값 = X-Admin-Key)
+    """
+    __tablename__ = "admin_account"
+
+    id = Column(Integer, primary_key=True)  # 1만 사용
+    username = Column(String(64), nullable=False, default="admin")
+    password_hash = Column(String(255), nullable=False)
+    api_key = Column(String(128), nullable=False, index=True)
+    version = Column(Integer, nullable=False, default=1)
+    updated_at = Column(DateTime(timezone=True), default=datetime.now, nullable=False)

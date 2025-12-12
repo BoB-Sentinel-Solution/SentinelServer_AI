@@ -4,8 +4,110 @@
   <meta charset="utf-8" />
   <title>Sentinel Settings</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+
   <link rel="stylesheet" href="./vendor/reset.min.css" />
   <link rel="stylesheet" href="./css/styles.css" />
+
+  <!-- ✅ Account Settings 전용 CSS (HTML 안에 포함) -->
+  <style>
+    /* ===== Settings: Account panel ===== */
+    .settings-panel {
+      background: #eaf2ff;           /* 연한 블루 패널 */
+      border-radius: 18px;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .settings-panel .card-body {
+      padding-top: 8px;
+    }
+
+    .settings-row {
+      padding: 14px 0 18px;
+    }
+
+    .settings-row + .settings-row {
+      border-top: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .settings-row-head {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+
+    .settings-row-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: #0f172a;
+    }
+
+    .settings-row-desc {
+      font-size: 12px;
+      color: rgba(15, 23, 42, 0.55);
+    }
+
+    .settings-row-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .settings-input-group {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      height: 44px;
+    }
+
+    .settings-input {
+      flex: 1;
+      height: 44px;
+      border: 0;
+      outline: 0;
+      padding: 0 14px;
+      font-size: 14px;
+      background: transparent;
+    }
+
+    .settings-action-btn {
+      height: 44px;
+      padding: 0 18px;
+      border: 0;
+      border-left: 1px solid rgba(15, 23, 42, 0.12);
+      background: #e5e7eb; /* 버튼 회색 */
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .settings-action-btn:active {
+      transform: translateY(1px);
+    }
+
+    .settings-ok {
+      width: 34px;
+      text-align: center;
+      font-size: 28px;
+      font-weight: 900;
+      color: #22c55e; /* 체크 초록 */
+      line-height: 1;
+    }
+
+    @media (max-width: 600px) {
+      .settings-row-head {
+        flex-direction: column;
+        gap: 6px;
+      }
+      .settings-action-btn {
+        padding: 0 12px;
+      }
+    }
+  </style>
 </head>
 
 <body class="sentinel-body">
@@ -37,6 +139,49 @@
   </header>
 
   <main class="dashboard-layout">
+
+    <!-- ✅ Account Settings (상단 추가) -->
+    <section class="card settings-panel">
+      <div class="card-header">
+        <h3 class="card-title">Account Settings</h3>
+      </div>
+
+      <div class="card-body">
+        <!-- ID Resetting -->
+        <div class="settings-row">
+          <div class="settings-row-head">
+            <div class="settings-row-title">아이디 재설정 / ID Resetting</div>
+            <div class="settings-row-desc">Reset the ID used to log in.</div>
+          </div>
+
+          <div class="settings-row-controls">
+            <div class="settings-input-group">
+              <input id="account-new-id" class="settings-input" type="text" placeholder="" autocomplete="off" />
+              <button id="btn-change-id" class="settings-action-btn" type="button">Change ID</button>
+            </div>
+            <span id="account-id-ok" class="settings-ok" aria-label="ok" title="Saved" hidden>✓</span>
+          </div>
+        </div>
+
+        <!-- PW Resetting -->
+        <div class="settings-row">
+          <div class="settings-row-head">
+            <div class="settings-row-title">비밀번호 재설정 / PW Resetting</div>
+            <div class="settings-row-desc">Reset the PW used to log in.</div>
+          </div>
+
+          <div class="settings-row-controls">
+            <div class="settings-input-group">
+              <input id="account-new-pw" class="settings-input" type="password" placeholder="" autocomplete="new-password" />
+              <button id="btn-change-pw" class="settings-action-btn" type="button">Change PW</button>
+            </div>
+            <span id="account-pw-ok" class="settings-ok" aria-label="ok" title="Saved" hidden>✓</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 기존: Important Information Settings -->
     <section class="card">
       <div class="card-header">
         <h3 class="card-title">Important Information Settings</h3>
@@ -47,7 +192,6 @@
         <div style="margin-bottom:16px;">
           <div style="font-weight:600; margin-bottom:8px;">대응 방법 / Response Method</div>
 
-          <!-- ✅ 체크박스 말고 라디오(단일 선택) 추천 -->
           <label><input type="radio" name="response_method" value="mask"> 마스킹 / Masking</label>
           <span style="display:inline-block; width:16px;"></span>
           <label><input type="radio" name="response_method" value="allow"> 허용 / Allow</label>
@@ -75,6 +219,7 @@
       </div>
     </section>
 
+    <!-- 기존: UI Settings -->
     <section class="card">
       <div class="card-header">
         <h3 class="card-title">UI Settings</h3>

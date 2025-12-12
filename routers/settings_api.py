@@ -1,16 +1,17 @@
 # routers/settings_api.py
 from __future__ import annotations
 
-import os
-from typing import Optional
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-from schemas import SettingsOut, SettingsUpdateIn, SettingsConfig
 from models import SettingsRecord
 from db import SessionLocal  # ✅ get_db가 없으니 SessionLocal을 가져와서 여기서 정의
+from routers.auth_api import require_admin  # ✅ X-Admin-Key 검증(= DB api_key + (선택) ADMIN_KEY 우회)
 
 router = APIRouter(prefix="/api", tags=["settings"])
 
@@ -20,7 +21,6 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
-        db.commit()
     except Exception:
         db.rollback()
         raise
@@ -38,12 +38,46 @@ def _dump_model(m) -> dict:
     return dict(m)
 
 
-def require_admin_key(x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key")) -> None:
-    admin_key_env = os.environ.get("ADMIN_KEY", "").strip()  # ✅ 런타임에서 읽기
-    if not admin_key_env:
-        raise HTTPException(status_code=500, detail="ADMIN_KEY not configured")
-    if not x_admin_key or x_admin_key != admin_key_env:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin key")
+# =========================
+# ✅ schemas.py 의존 제거 (ImportError 방지)
+# =========================
+class SettingsConfig(BaseModel):
+    # 서버 정책(모든 요청에 영향)
+    response_method: str = Field(default="mask")  # "mask" | "allow" | "block"
+
+    # 서버에 저장되는 서비스 필터
+    # settings.js 와 동일한 구조:
+    # service_filters: {
+    #   llm: { gpt, gemini, claude, deepseek, groq },
+    #   mcp: { gpt_desktop, claude_desktop, vscode_copilot }
+    # }
+    service_filters: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "llm": {
+                "gpt": True,
+                "gemini": True,
+                "claude": True,
+                "deepseek": True,
+                "groq": True,
+            },
+            "mcp": {
+                "gpt_desktop": True,
+                "claude_desktop": True,
+                "vscode_copilot": True,
+            },
+        }
+    )
+
+
+class SettingsOut(BaseModel):
+    config: SettingsConfig
+    version: int
+    updated_at: Optional[str] = None
+
+
+class SettingsUpdateIn(BaseModel):
+    config: SettingsConfig
+    version: int
 
 
 def _default_config() -> SettingsConfig:
@@ -59,6 +93,7 @@ def _get_or_create_settings(db: Session) -> SettingsRecord:
     rec = SettingsRecord(id=1)
     rec.set_config(_dump_model(_default_config()))
     rec.version = 1
+    rec.updated_at = datetime.now()
     db.add(rec)
 
     try:
@@ -76,7 +111,7 @@ def _get_or_create_settings(db: Session) -> SettingsRecord:
 @router.get("/settings", response_model=SettingsOut)
 def get_settings(
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_key),
+    _: Any = Depends(require_admin),  # ✅ X-Admin-Key 검증은 auth_api 로 통일
 ) -> SettingsOut:
     rec = _get_or_create_settings(db)
 
@@ -97,7 +132,7 @@ def get_settings(
 def update_settings(
     body: SettingsUpdateIn,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_key),
+    _: Any = Depends(require_admin),  # ✅ X-Admin-Key 검증은 auth_api 로 통일
 ) -> SettingsOut:
     rec = _get_or_create_settings(db)
 
@@ -111,6 +146,7 @@ def update_settings(
     new_cfg = _dump_model(body.config)
     rec.set_config(new_cfg)
     rec.version = int(rec.version or 1) + 1
+    rec.updated_at = datetime.now()
     db.add(rec)
 
     db.commit()

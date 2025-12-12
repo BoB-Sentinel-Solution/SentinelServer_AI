@@ -178,7 +178,7 @@
   // resp: { api_key, username, version, updated_at }
   async function changeUsername() {
     const newId = getVal("account-new-id");
-    if (!newId) throw new Error("새 아이디를 입력해줘.");
+    if (!newId) throw new Error("새 아이디를 입력해주세요.");
 
     const res = await apiPut("/auth/id", { new_username: newId });
     if (!res) return;
@@ -197,8 +197,8 @@
   // resp: { api_key, username, version, updated_at }
   async function changePassword() {
     const newPw = getVal("account-new-pw");
-    if (!newPw) throw new Error("새 비밀번호를 입력해줘.");
-    if (newPw.length < 6) throw new Error("새 비밀번호는 6자 이상으로 해줘.");
+    if (!newPw) throw new Error("새 비밀번호를 입력해주세요.");
+    if (newPw.length < 6) throw new Error("새 비밀번호는 6자 이상으로 해주세요.");
 
     const res = await apiPut("/auth/password", { new_password: newPw });
     if (!res) return;

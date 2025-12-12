@@ -493,48 +493,46 @@
             administrator.
           </p>
 
-          <form id="login-form" class="login-form">
-            <label class="form-label">
-              Email address
-              <div class="form-input-wrapper">
-                <span class="form-input-icon">📧</span>
-                <input
-                  type="email"
-                  name="email"
-                  class="form-input"
-                  placeholder="admin@example.com"
-                  autocomplete="username"
-                  required
-                />
-              </div>
-            </label>
+<form id="login-form" class="login-form">
+  <label class="form-label">
+    Username
+    <div class="form-input-wrapper">
+      <span class="form-input-icon">👤</span>
+      <input
+        type="text"
+        name="username"
+        class="form-input"
+        placeholder="admin"
+        autocomplete="username"
+        required
+      />
+    </div>
+  </label>
 
-            <label class="form-label">
-              Password
-              <div class="form-input-wrapper">
-                <span class="form-input-icon">🔒</span>
-                <input
-                  type="password"
-                  name="password"
-                  class="form-input"
-                  placeholder="Admin API key or password"
-                  autocomplete="current-password"
-                  required
-                />
-              </div>
-            </label>
+  <label class="form-label">
+    Password
+    <div class="form-input-wrapper">
+      <span class="form-input-icon">🔒</span>
+      <input
+        type="password"
+        name="password"
+        class="form-input"
+        placeholder="Password"
+        autocomplete="current-password"
+        required
+      />
+    </div>
+  </label>
 
-            <p class="login-hint">
-              * 현재 버전에서는 비밀번호를 Sentinel Server의 관리자 키로 사용하고,<br />
-              &nbsp;&nbsp;API 호출 시 <code>X-Admin-Key</code> 헤더로 전달합니다.
-            </p>
+  <p class="login-hint">
+    * 아이디/비밀번호로 로그인하면 서버가 <code>api_key</code>를 발급하고,<br />
+    &nbsp;&nbsp;이 키를 <code>X-Admin-Key</code> 헤더로 저장/사용합니다.
+  </p>
 
-            <button type="submit" class="btn btn-primary btn-block">
-              Log in
-            </button>
+  <button type="submit" class="btn btn-primary btn-block">Log in</button>
+  <p id="login-error" class="form-error" hidden></p>
+</form>
 
-            <p id="login-error" class="form-error" hidden></p>
-          </form>
         </div>
       </section>
     </main>

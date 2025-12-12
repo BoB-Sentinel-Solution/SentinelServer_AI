@@ -294,12 +294,29 @@ class DbLoggingService:
         # 2) OCR (이미지 유사도 차단 / 파일 내 텍스트 민감도 판정에 사용)
         ocr_text, ocr_used, _ = OcrService.run_ocr(item)
 
-        # (선택) OCR 텍스트에도 정규식 적용 (파일 내 민감값 탐지용)
+        # (강화) OCR 텍스트에도 정규식 적용 (원문 OCR + 수사치환 OCR 2회 탐지 후 병합)
         if ocr_used and ocr_text:
+            # 1) 원문 OCR 기반 탐지
             try:
-                regex_ents_ocr = regex_detect(ocr_text)
+                regex_ents_ocr_raw = regex_detect(ocr_text)
             except Exception:
-                regex_ents_ocr = []
+                regex_ents_ocr_raw = []
+
+            # 2) 수사 치환 OCR 기반 탐지
+            ocr_norm = normalize_obfuscated_numbers(ocr_text)
+            try:
+                regex_ents_ocr_norm = regex_detect(ocr_norm)
+            except Exception:
+                regex_ents_ocr_norm = []
+
+            # 2-1) norm 탐지 결과의 value를 OCR "원문" 기준으로 복구
+            for e in regex_ents_ocr_norm:
+                b, en = int(e.get("begin", -1)), int(e.get("end", -1))
+                if 0 <= b < en <= len(ocr_text):
+                    e["value"] = ocr_text[b:en]
+
+            # 3) 병합 (원문 OCR 탐지 우선)
+            regex_ents_ocr = _dedup_spans(regex_ents_ocr_raw, regex_ents_ocr_norm)
         else:
             regex_ents_ocr = []
 
@@ -330,7 +347,6 @@ class DbLoggingService:
 
         # 3-4) 두 결과 병합 (원문 탐지 우선)
         regex_ents_prompt = _dedup_spans(regex_ents_prompt_raw, regex_ents_prompt_norm)
-
 
         # 4) AI 입력용 마스킹(정규식 결과로만 라벨링, 괄호 포함)
         masked_for_ai = mask_with_parens_by_entities(

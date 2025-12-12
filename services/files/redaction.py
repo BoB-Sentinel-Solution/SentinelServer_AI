@@ -8,6 +8,7 @@ import math
 
 from services.attachment import SavedFileInfo
 from services.regex_rules import PATTERNS as REGEX_PATTERNS
+from services.normalize_numbers import normalize_obfuscated_numbers  # ✅ 추가
 
 # -------------------------------
 # 외부 라이브러리 (선택)
@@ -279,10 +280,12 @@ def _ocr_sensitive_boxes(ocr_data: dict) -> List[Tuple[int, int, int, int]]:
         if not s:
             continue
 
+        sn = normalize_obfuscated_numbers(s)  # ✅ 추가: 토큰 정규화(길이 유지)
+
         # 모든 토큰형 PATTERNS에 대해 검사
         for label in TOKEN_LABELS:
             rx = REGEX_PATTERNS.get(label)
-            if rx and rx.search(s):
+            if rx and (rx.search(s) or rx.search(sn)):  # ✅ 변경
                 x1 = int(L[i])
                 y1 = int(T[i])
                 x2 = x1 + int(W[i])
@@ -393,9 +396,10 @@ def _redact_image_file(saved: SavedFileInfo) -> RedactedFileInfo:
 
     # PRIVATE_KEY 같이 블록 패턴은 전체 텍스트 기준으로 검사해서
     # 한 번이라도 매칭되면 페이지 전체를 박스로 가려버린다 (보수적 처리).
+    text_norm = normalize_obfuscated_numbers(text)  # ✅ 추가
     for label in PAGE_ONLY_LABELS:
         rx = REGEX_PATTERNS.get(label)
-        if rx and rx.search(text):
+        if rx and (rx.search(text) or rx.search(text_norm)):  # ✅ 변경
             boxes.append((0, 0, pil.width, pil.height))
             break
 
@@ -479,9 +483,12 @@ def _pdf_sensitive_boxes(page) -> List["fitz.Rect"]:
             s = str(word or "").strip()
             if not s:
                 continue
+
+            sn = normalize_obfuscated_numbers(s)  # ✅ 추가
+
             for label in TOKEN_LABELS:
                 rx = REGEX_PATTERNS.get(label)
-                if rx and rx.search(s):
+                if rx and (rx.search(s) or rx.search(sn)):  # ✅ 변경
                     rects.append(fitz.Rect(x0, y0, x1, y1))  # type: ignore[arg-type]
                     break
     except Exception:
@@ -561,9 +568,10 @@ def _redact_pdf_file(saved: SavedFileInfo) -> RedactedFileInfo:
 
                 # PRIVATE_KEY 같이 블록성 패턴은 페이지 전체를 가린다.
                 full_text = page.get_text("text") or ""
+                full_text_norm = normalize_obfuscated_numbers(full_text)  # ✅ 추가
                 for label in PAGE_ONLY_LABELS:
                     rx = REGEX_PATTERNS.get(label)
-                    if rx and rx.search(full_text):
+                    if rx and (rx.search(full_text) or rx.search(full_text_norm)):  # ✅ 변경
                         page_rects.append(page.rect)  # 전체 페이지
                         break
 
@@ -594,9 +602,10 @@ def _redact_pdf_file(saved: SavedFileInfo) -> RedactedFileInfo:
                 boxes = _ocr_sensitive_boxes(data_tmp)
 
                 # PRIVATE_KEY 등 페이지 전체 패턴
+                text_norm = normalize_obfuscated_numbers(text)  # ✅ 추가
                 for label in PAGE_ONLY_LABELS:
                     rx = REGEX_PATTERNS.get(label)
-                    if rx and rx.search(text):
+                    if rx and (rx.search(text) or rx.search(text_norm)):  # ✅ 변경
                         boxes.append((0, 0, pix.width, pix.height))
                         break
 

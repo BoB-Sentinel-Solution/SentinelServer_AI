@@ -8,6 +8,13 @@
     catch { return ""; }
   }
 
+  function setAdminKey(key) {
+    try {
+      if (key) localStorage.setItem(STORAGE_KEY, key);
+      else localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+  }
+
   async function apiGet(path) {
     const r = await fetch(API_BASE + path, {
       method: "GET",
@@ -158,50 +165,50 @@
     const el = document.getElementById(id);
     if (el && typeof el.value === "string") el.value = "";
   }
-
-  // ✅ 비밀번호 변경: 서버에 실제 반영되게 하려면 서버에 이 API가 있어야 함
-  // PUT /api/account/password
-  // body: { current_password: "...", new_password: "..." }
-  async function changePassword() {
-    const cur = getVal("acc-current-password");
-    const p1  = getVal("acc-new-password");
-    const p2  = getVal("acc-new-password2");
-
-    if (!cur) throw new Error("현재 비밀번호를 입력해줘.");
-    if (!p1 || !p2) throw new Error("새 비밀번호를 입력해줘.");
-    if (p1 !== p2) throw new Error("새 비밀번호 확인이 일치하지 않아.");
-    if (p1.length < 8) throw new Error("새 비밀번호는 8자 이상으로 해줘.");
-
-    // 서버 반영
-    await apiPut("/account/password", {
-      current_password: cur,
-      new_password: p1,
-    });
-
-    clearVal("acc-current-password");
-    clearVal("acc-new-password");
-    clearVal("acc-new-password2");
-    alert("비밀번호 변경 완료");
+  function showOk(id, ms = 1200) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.hidden = false;
+    window.setTimeout(() => { el.hidden = true; }, ms);
   }
 
-  // (선택) 아이디 변경까지 하려면 서버에 API가 필요함
-  // PUT /api/account/username
-  // body: { new_username: "...", current_password: "..." }
+  // ✅ 아이디 변경: auth_api.py
+  // PUT /api/auth/id
+  // body: { new_username: "..." }
+  // resp: { api_key, username, version, updated_at }
   async function changeUsername() {
-    const newId = getVal("acc-new-id");
-    const curPw = getVal("acc-current-password-for-id"); // HTML에서 따로 둘 때
-
+    const newId = getVal("account-new-id");
     if (!newId) throw new Error("새 아이디를 입력해줘.");
-    if (!curPw) throw new Error("현재 비밀번호를 입력해줘.");
 
-    await apiPut("/account/username", {
-      new_username: newId,
-      current_password: curPw,
-    });
+    const res = await apiPut("/auth/id", { new_username: newId });
+    if (!res) return;
 
-    clearVal("acc-new-id");
-    clearVal("acc-current-password-for-id");
-    alert("아이디 변경 완료");
+    // ✅ 서버가 api_key 회전시키므로 새 키로 교체
+    if (res.api_key) setAdminKey(res.api_key);
+
+    clearVal("account-new-id");
+    showOk("account-id-ok");
+    alert("아이디 변경 완료\n(보안을 위해 세션 키가 갱신되었습니다.)");
+  }
+
+  // ✅ 비밀번호 변경: auth_api.py
+  // PUT /api/auth/password
+  // body: { new_password: "..." }
+  // resp: { api_key, username, version, updated_at }
+  async function changePassword() {
+    const newPw = getVal("account-new-pw");
+    if (!newPw) throw new Error("새 비밀번호를 입력해줘.");
+    if (newPw.length < 6) throw new Error("새 비밀번호는 6자 이상으로 해줘.");
+
+    const res = await apiPut("/auth/password", { new_password: newPw });
+    if (!res) return;
+
+    // ✅ 서버가 api_key 회전시키므로 새 키로 교체
+    if (res.api_key) setAdminKey(res.api_key);
+
+    clearVal("account-new-pw");
+    showOk("account-pw-ok");
+    alert("비밀번호 변경 완료\n(보안을 위해 세션 키가 갱신되었습니다.)");
   }
 
   let serverVersion = null;
@@ -239,13 +246,12 @@
       location.href = "./index.html";
     });
 
-    // Account panel buttons
-    const btnPw = document.getElementById("btn-change-password");
-    if (btnPw) btnPw.addEventListener("click", () => changePassword().catch(e => alert(e.message)));
-
-    // 아이디 변경까지 UI에 넣는 경우에만 사용
+    // Account panel buttons (HTML id와 일치)
     const btnId = document.getElementById("btn-change-id");
     if (btnId) btnId.addEventListener("click", () => changeUsername().catch(e => alert(e.message)));
+
+    const btnPw = document.getElementById("btn-change-pw");
+    if (btnPw) btnPw.addEventListener("click", () => changePassword().catch(e => alert(e.message)));
   }
 
   // init

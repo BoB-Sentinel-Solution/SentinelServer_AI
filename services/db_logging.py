@@ -202,7 +202,7 @@ class DbLoggingService:
         file_changed: bool = False
 
         try:
-            # 1) 텍스트 기반 문서(DOCX/PPTX/XLSX/TXT/CSV) → detection 파일 생성
+            # 1) 텍스트 기반 문서(DOCX/PPTX/XLSX/TXT/CSV) → 민감정보 있을 때만 detection 파일 생성
             if ext in DOC_EXTS and ext != "pdf":
                 logger.info(f"[ATTACH] process_saved_file: {saved.path} (ext={ext})")
                 process_saved_file(saved)
@@ -210,10 +210,14 @@ class DbLoggingService:
                 detection_path = saved.path.with_name(
                     f"{saved.path.stem}.detection{saved.path.suffix}"
                 )
-                processed_path = detection_path
-                # detection 파일이 실제로 생성되고, 원본과 경로가 다르면 '변화'로 간주
-                if detection_path.exists() and detection_path != saved.path:
+
+                # ✅ 수정 핵심: detection 파일이 실제로 있을 때만 그걸 반환 + file_change=True
+                if detection_path.exists():
+                    processed_path = detection_path
                     file_changed = True
+                else:
+                    processed_path = saved.path
+                    file_changed = False
 
             # 2) 이미지/스캔/PDF 등 → redaction 파이프라인
             else:

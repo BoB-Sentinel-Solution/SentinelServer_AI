@@ -16,6 +16,8 @@ from services.attachment import save_attachment_file, SavedFileInfo
 from services.similarity import best_similarity_against_folder
 from repositories.log_repo import LogRepository
 
+from services.normalize_numbers import normalize_obfuscated_numbers
+
 # 1) 정규식 1차 감지기
 from services.regex_detector import detect_entities as regex_detect
 # 2) 외부 판별기 러너(offline_sensitive_detector_min.py 호출)
@@ -304,12 +306,31 @@ class DbLoggingService:
         # === 파일 내 민감정보 플래그 ===
         file_has_sensitive = bool(regex_ents_ocr)
 
-        # 3) 정규식 1차 감지 (프롬프트 원문 기준 스팬 확보)
+        # 3) 정규식 1차 감지 (원문 + 수사치환본 2회 탐지 후 병합)
         prompt_text = item.prompt or ""
+
+        # 3-1) 원문 기반 탐지
         try:
-            regex_ents_prompt: List[Dict[str, Any]] = regex_detect(prompt_text)
+            regex_ents_prompt_raw: List[Dict[str, Any]] = regex_detect(prompt_text)
         except Exception:
-            regex_ents_prompt = []
+            regex_ents_prompt_raw = []
+
+        # 3-2) 수사 치환본 기반 탐지
+        prompt_norm = normalize_obfuscated_numbers(prompt_text)
+        try:
+            regex_ents_prompt_norm: List[Dict[str, Any]] = regex_detect(prompt_norm)
+        except Exception:
+            regex_ents_prompt_norm = []
+
+        # 3-3) norm 탐지 결과의 value를 "원문 슬라이스"로 복구 (begin/end는 길이 동일이라 그대로 사용 가능)
+        for e in regex_ents_prompt_norm:
+            b, en = int(e.get("begin", -1)), int(e.get("end", -1))
+            if 0 <= b < en <= len(prompt_text):
+                e["value"] = prompt_text[b:en]
+
+        # 3-4) 두 결과 병합 (원문 탐지 우선)
+        regex_ents_prompt = _dedup_spans(regex_ents_prompt_raw, regex_ents_prompt_norm)
+
 
         # 4) AI 입력용 마스킹(정규식 결과로만 라벨링, 괄호 포함)
         masked_for_ai = mask_with_parens_by_entities(

@@ -73,12 +73,16 @@
 
   function loadUiTheme() {
     const saved = (localStorage.getItem("sentinel_theme") || "light");
-    writeRadio("ui_theme", saved);
+    // ✅ UI Settings 섹션을 제거했으므로 ui_theme 라디오를 더 이상 만지지 않음
+    // writeRadio("ui_theme", saved);
     document.documentElement.dataset.theme = saved;
   }
 
   function saveUiTheme() {
-    const t = readRadio("ui_theme") || "light";
+    // ✅ UI Settings 섹션 제거 대응:
+    // 기존에는 ui_theme 라디오 값을 읽어서 저장했지만,
+    // 이제는 라디오가 없으므로 "저장된 테마를 유지"하고 적용만 한다.
+    const t = (localStorage.getItem("sentinel_theme") || "light");
     localStorage.setItem("sentinel_theme", t);
     document.documentElement.dataset.theme = t;
   }

@@ -15,6 +15,7 @@ from sqlalchemy import cast, Text, func  # JSON 검색 + interface 필터용
 from db import SessionLocal, Base, engine
 from models import LogRecord, McpConfigEntry
 from config import settings
+from routers.auth_api import require_admin as require_admin_auth
 from services.reason_llm import infer_intent_with_llm
   
 # 접두는 app.py에서 prefix="/api"로 부여
@@ -69,18 +70,18 @@ def get_db():
         db.close()
 
 
-# --- 선택적 API 키 인증 ---
-def require_admin(x_admin_key: str | None = Header(default=None)):
-    """
-    - .env 의 DASHBOARD_API_KEY 가 설정되어 있다면 X-Admin-Key 헤더로 검증
-    - 없으면 무인증 허용
-    """
-    if settings.DASHBOARD_API_KEY:
-        if x_admin_key != settings.DASHBOARD_API_KEY:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid API key",
-            )
+# # --- 선택적 API 키 인증 ---
+# def require_admin(x_admin_key: str | None = Header(default=None)):
+#     """
+#     - .env 의 DASHBOARD_API_KEY 가 설정되어 있다면 X-Admin-Key 헤더로 검증
+#     - 없으면 무인증 허용
+#     """
+#     if settings.DASHBOARD_API_KEY:
+#         if x_admin_key != settings.DASHBOARD_API_KEY:
+#             raise HTTPException(
+#                 status_code=status.HTTP_401_UNAUTHORIZED,
+#                 detail="Invalid API key",
+#             )
 
 # ---------------------------
 # Reason / Risk 패턴 정의
@@ -333,7 +334,7 @@ def infer_intent_and_reason_from_context(
     return intent, reason
 
 # ---------- 요약 API ----------
-@router.get("/summary", dependencies=[Depends(require_admin)])
+@router.get("/summary", dependencies=[Depends(require_admin_auth)])
 def dashboard_summary(
     interface: str | None = None,  # ?interface=LLM / MCP 등 필터
     db: Session = Depends(get_db),
@@ -579,7 +580,7 @@ def dashboard_summary(
 
 
 # ---------- 전체 로그 조회 API (Logs 페이지용) ----------
-@router.get("/logs", dependencies=[Depends(require_admin)])
+@router.get("/logs", dependencies=[Depends(require_admin_auth)])
 def list_logs(
     page: int = 1,
     page_size: int = 20,
@@ -668,7 +669,7 @@ def list_logs(
         "page_size": page_size,
     }
 
-@router.get("/mcp/config_summary")
+@router.get("/mcp/config_summary", dependencies=[Depends(require_admin_auth)])
 def mcp_config_summary(db: Session = Depends(get_db)):
     """
     MCP 설정 파일 기반 CONFIG 리포트 요약
@@ -872,7 +873,7 @@ def mcp_config_summary(db: Session = Depends(get_db)):
         "prediction": prediction,
     }
 
-@router.get("/network/summary", dependencies=[Depends(require_admin)])
+@router.get("/network/summary", dependencies=[Depends(require_admin_auth)])
 def network_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """
     네트워크 리포트(외부 IP / 사설망 / 의심 PC)용 요약 데이터.
@@ -1042,7 +1043,7 @@ def network_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
         "suspicious_logs": suspicious_logs,
     }
 
-@router.get("/report/llm/file-summary", dependencies=[Depends(require_admin)])
+@router.get("/report/llm/file-summary", dependencies=[Depends(require_admin_auth)])
 def report_llm_file_summary(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1130,7 +1131,7 @@ def report_llm_file_summary(
 
 # ---------- Reason 페이지: 탐지 건수 TOP 5 ----------
 
-@router.get("/reason/top5", dependencies=[Depends(require_admin)])
+@router.get("/reason/top5", dependencies=[Depends(require_admin_auth)])
 def reason_top5(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """
     Reason 페이지 상단 '탐지 건수 TOP 5'용 데이터.
@@ -1176,7 +1177,7 @@ def reason_top5(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
 # ---------- Reason 페이지: 선택된 PC 상세 분석 ----------
 
-@router.get("/reason/summary", dependencies=[Depends(require_admin)])
+@router.get("/reason/summary", dependencies=[Depends(require_admin_auth)])
 def reason_summary(
     pc_name: str,
     host: str | None = None,

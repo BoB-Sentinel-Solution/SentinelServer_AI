@@ -8,15 +8,16 @@
   <link rel="stylesheet" href="./vendor/reset.min.css" />
   <link rel="stylesheet" href="./css/styles.css" />
 
-  <!-- ✅ Account Settings 전용 CSS (HTML 안에 포함) -->
+  <!-- ✅ Account Settings + Important Settings 동일 패널 스타일 -->
   <style>
-    /* ===== Settings: Account panel ===== */
+    /* ===== Settings: Account/Important panel ===== */
     .settings-panel {
       background: #eaf2ff;           /* 연한 블루 패널 */
       border-radius: 18px;
       border: 1px solid rgba(15, 23, 42, 0.06);
     }
 
+    /* card-body 상단 여백 살짝 */
     .settings-panel .card-body {
       padding-top: 8px;
     }
@@ -98,6 +99,32 @@
       line-height: 1;
     }
 
+    /* Important Information Settings 안쪽 레이아웃(인라인 스타일 제거 목적) */
+    .ii-group-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: #0f172a;
+      margin: 10px 0 8px;
+    }
+
+    .ii-inline-gap {
+      display: inline-block;
+      width: 16px;
+    }
+
+    .ii-divider {
+      opacity: .2;
+      margin: 16px 0;
+      border: 0;
+      border-top: 1px solid rgba(15, 23, 42, 0.2);
+    }
+
+    .ii-checks {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
     @media (max-width: 600px) {
       .settings-row-head {
         flex-direction: column;
@@ -140,7 +167,7 @@
 
   <main class="dashboard-layout">
 
-    <!-- ✅ Account Settings (상단 추가) -->
+    <!-- ✅ Account Settings -->
     <section class="card settings-panel">
       <div class="card-header">
         <h3 class="card-title">Account Settings</h3>
@@ -195,54 +222,43 @@
       </div>
     </section>
 
-    <!-- 기존: Important Information Settings -->
-    <section class="card">
+    <!-- ✅ Important Information Settings : Account 패널과 동일한 스타일 적용 -->
+    <section class="card settings-panel">
       <div class="card-header">
         <h3 class="card-title">Important Information Settings</h3>
         <span class="card-subtitle">서버 정책(모든 요청에 영향)</span>
       </div>
 
       <div class="card-body">
-        <div style="margin-bottom:16px;">
-          <div style="font-weight:600; margin-bottom:8px;">대응 방법 / Response Method</div>
+        <div class="settings-row">
+          <div class="ii-group-title">대응 방법 / Response Method</div>
 
           <label><input type="radio" name="response_method" value="mask"> 마스킹 / Masking</label>
-          <span style="display:inline-block; width:16px;"></span>
+          <span class="ii-inline-gap"></span>
           <label><input type="radio" name="response_method" value="allow"> 허용 / Allow</label>
-          <span style="display:inline-block; width:16px;"></span>
+          <span class="ii-inline-gap"></span>
           <label><input type="radio" name="response_method" value="block"> 차단 / Blocking</label>
+
+          <hr class="ii-divider" />
+
+          <div class="ii-group-title">LLM Service Settings</div>
+          <div class="ii-checks">
+            <label><input type="checkbox" id="llm-gpt"> GPT</label>
+            <label><input type="checkbox" id="llm-gemini"> Gemini</label>
+            <label><input type="checkbox" id="llm-claude"> Claude</label>
+            <label><input type="checkbox" id="llm-deepseek"> Deepseek</label>
+            <label><input type="checkbox" id="llm-groq"> Groq</label>
+          </div>
+
+          <hr class="ii-divider" />
+
+          <div class="ii-group-title">MCP Service Settings</div>
+          <div class="ii-checks">
+            <label><input type="checkbox" id="mcp-gpt-desktop"> GPT Desktop</label>
+            <label><input type="checkbox" id="mcp-claude-desktop"> Claude Desktop</label>
+            <label><input type="checkbox" id="mcp-vscode"> VSCode (copilot)</label>
+          </div>
         </div>
-
-        <hr style="opacity:.2; margin:16px 0;">
-
-        <div style="margin-bottom:10px; font-weight:600;">LLM Service Settings</div>
-        <div style="display:flex; gap:18px; flex-wrap:wrap;">
-          <label><input type="checkbox" id="llm-gpt"> GPT</label>
-          <label><input type="checkbox" id="llm-gemini"> Gemini</label>
-          <label><input type="checkbox" id="llm-claude"> Claude</label>
-          <label><input type="checkbox" id="llm-deepseek"> Deepseek</label>
-          <label><input type="checkbox" id="llm-groq"> Groq</label>
-        </div>
-
-        <div style="margin:18px 0 10px; font-weight:600;">MCP Service Settings</div>
-        <div style="display:flex; gap:18px; flex-wrap:wrap;">
-          <label><input type="checkbox" id="mcp-gpt-desktop"> GPT Desktop</label>
-          <label><input type="checkbox" id="mcp-claude-desktop"> Claude Desktop</label>
-          <label><input type="checkbox" id="mcp-vscode"> VSCode (copilot)</label>
-        </div>
-      </div>
-    </section>
-
-    <!-- 기존: UI Settings -->
-    <section class="card">
-      <div class="card-header">
-        <h3 class="card-title">UI Settings</h3>
-        <span class="card-subtitle">브라우저(UI)만 변경</span>
-      </div>
-      <div class="card-body">
-        <label><input type="radio" name="ui_theme" value="light"> Light</label>
-        <span style="display:inline-block; width:16px;"></span>
-        <label><input type="radio" name="ui_theme" value="dark"> Dark</label>
       </div>
     </section>
 

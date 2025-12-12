@@ -133,8 +133,8 @@
       <span class="top-updated-label">UPDATED:</span>
       <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
 
-      <button id="btn-refresh" class="btn btn-small">Refresh</button>
-      <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+      <button id="btn-refresh" class="btn btn-small" type="button">Refresh</button>
+      <button id="btn-logout" class="btn btn-small btn-ghost" type="button">Logout</button>
     </div>
   </header>
 
@@ -156,7 +156,14 @@
 
           <div class="settings-row-controls">
             <div class="settings-input-group">
-              <input id="account-new-id" class="settings-input" type="text" placeholder="" autocomplete="off" />
+              <input
+                id="account-new-id"
+                class="settings-input"
+                type="text"
+                name="account_new_id"
+                placeholder=""
+                autocomplete="off"
+              />
               <button id="btn-change-id" class="settings-action-btn" type="button">Change ID</button>
             </div>
             <span id="account-id-ok" class="settings-ok" aria-label="ok" title="Saved" hidden>✓</span>
@@ -172,7 +179,14 @@
 
           <div class="settings-row-controls">
             <div class="settings-input-group">
-              <input id="account-new-pw" class="settings-input" type="password" placeholder="" autocomplete="new-password" />
+              <input
+                id="account-new-pw"
+                class="settings-input"
+                type="password"
+                name="account_new_pw"
+                placeholder=""
+                autocomplete="new-password"
+              />
               <button id="btn-change-pw" class="settings-action-btn" type="button">Change PW</button>
             </div>
             <span id="account-pw-ok" class="settings-ok" aria-label="ok" title="Saved" hidden>✓</span>
@@ -233,7 +247,7 @@
     </section>
 
     <div style="display:flex; justify-content:flex-end; gap:10px;">
-      <button id="btn-save" class="btn">Save</button>
+      <button id="btn-save" class="btn" type="button">Save</button>
     </div>
   </main>
 

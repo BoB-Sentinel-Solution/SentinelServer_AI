@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Sentinel Settings</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="./vendor/reset.min.css" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+
+<body class="sentinel-body">
+  <header class="top-nav">
+    <div class="top-nav-left">
+      <div class="top-logo">
+        <span class="top-logo-main">SENTINEL</span>
+        <span class="top-logo-sub">DASHBOARD</span>
+      </div>
+
+      <nav class="top-menu">
+        <a class="top-menu-item" href="./dashboard.html">Dashboard</a>
+        <a class="top-menu-item" href="./report.html">Report</a>
+        <a class="top-menu-item" href="./logs.html">Logs</a>
+        <a class="top-menu-item" href="./reason.html">Reason</a>
+        <a class="top-menu-item" href="./network.html">Network</a>
+        <a class="top-menu-item" href="./score.html">Score</a>
+        <a class="top-menu-item top-menu-item--active" href="./settings.html">Settings</a>
+      </nav>
+    </div>
+
+    <div class="top-nav-right">
+      <span class="top-updated-label">UPDATED:</span>
+      <span id="top-updated-at" class="top-updated-value">--:--:-- KST</span>
+
+      <button id="btn-refresh" class="btn btn-small">Refresh</button>
+      <button id="btn-logout" class="btn btn-small btn-ghost">Logout</button>
+    </div>
+  </header>
+
+  <main class="dashboard-layout">
+    <section class="card">
+      <div class="card-header">
+        <h3 class="card-title">Important Information Settings</h3>
+        <span class="card-subtitle">서버 정책(모든 요청에 영향)</span>
+      </div>
+
+      <div class="card-body">
+        <div style="margin-bottom:16px;">
+          <div style="font-weight:600; margin-bottom:8px;">대응 방법 / Response Method</div>
+
+          <!-- ✅ 체크박스 말고 라디오(단일 선택) 추천 -->
+          <label><input type="radio" name="response_method" value="mask"> 마스킹 / Masking</label>
+          <span style="display:inline-block; width:16px;"></span>
+          <label><input type="radio" name="response_method" value="allow"> 허용 / Allow</label>
+          <span style="display:inline-block; width:16px;"></span>
+          <label><input type="radio" name="response_method" value="block"> 차단 / Blocking</label>
+        </div>
+
+        <hr style="opacity:.2; margin:16px 0;">
+
+        <div style="margin-bottom:10px; font-weight:600;">LLM Service Settings</div>
+        <div style="display:flex; gap:18px; flex-wrap:wrap;">
+          <label><input type="checkbox" id="llm-gpt"> GPT</label>
+          <label><input type="checkbox" id="llm-gemini"> Gemini</label>
+          <label><input type="checkbox" id="llm-claude"> Claude</label>
+          <label><input type="checkbox" id="llm-deepseek"> Deepseek</label>
+          <label><input type="checkbox" id="llm-groq"> Groq</label>
+        </div>
+
+        <div style="margin:18px 0 10px; font-weight:600;">MCP Service Settings</div>
+        <div style="display:flex; gap:18px; flex-wrap:wrap;">
+          <label><input type="checkbox" id="mcp-gpt-desktop"> GPT Desktop</label>
+          <label><input type="checkbox" id="mcp-claude-desktop"> Claude Desktop</label>
+          <label><input type="checkbox" id="mcp-vscode"> VSCode (copilot)</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h3 class="card-title">UI Settings</h3>
+        <span class="card-subtitle">브라우저(UI)만 변경</span>
+      </div>
+      <div class="card-body">
+        <label><input type="radio" name="ui_theme" value="light"> Light</label>
+        <span style="display:inline-block; width:16px;"></span>
+        <label><input type="radio" name="ui_theme" value="dark"> Dark</label>
+      </div>
+    </section>
+
+    <div style="display:flex; justify-content:flex-end; gap:10px;">
+      <button id="btn-save" class="btn">Save</button>
+    </div>
+  </main>
+
+  <script src="./js/api.js"></script>
+  <script src="./js/settings.js"></script>
+</body>
+</html>

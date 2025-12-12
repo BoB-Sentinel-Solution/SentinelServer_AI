@@ -4,12 +4,12 @@ from __future__ import annotations
 import uuid, time, os, base64
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-import logging  # 추가
+import logging
 
 from sqlalchemy.orm import Session
 
 from schemas import InItem, ServerOut, Entity
-from models import LogRecord
+from models import LogRecord, SettingsRecord  # ✅ SettingsRecord 추가
 from services.ocr import OcrService
 from services.masking import mask_by_entities, mask_with_parens_by_entities
 from services.attachment import save_attachment_file, SavedFileInfo
@@ -26,7 +26,7 @@ from services.ai_external import OfflineDetectorRunner
 # 3) 파일 처리(문서 detection / 이미지·PDF redaction)
 from services.files import process_saved_file, redact_saved_file, DOC_EXTS
 
-logger = logging.getLogger(__name__)  # 추가
+logger = logging.getLogger(__name__)
 
 ADMIN_IMAGE_DIR = Path("./SentinelServer_AI/adminset/image")
 SIMILARITY_THRESHOLD = 0.4  # 이미지 유사도 차단 임계
@@ -37,6 +37,76 @@ _DETECTOR = OfflineDetectorRunner(
     timeout_sec=20.0,
 )
 
+# =========================
+# Settings 기반 서비스 필터
+# =========================
+
+LLM_HOST_MAP = {
+    "gpt": "chatgpt",
+    "gemini": "gemini",
+    "claude": "claude",
+    "deepseek": "deepseek",
+    "groq": "groq",
+}
+
+MCP_HOST_MAP = {
+    "gpt_desktop": "chatgpt",
+    "claude_desktop": "claude",
+    "vscode_copilot": "copilot",
+}
+
+
+def _load_settings_config(db: Session) -> Dict[str, Any]:
+    """
+    settings(id=1)에서 config_json(dict)을 읽어옴.
+    - 테이블/레코드 없거나 예외면 {} 반환
+    """
+    try:
+        rec = db.get(SettingsRecord, 1)
+        if not rec:
+            return {}
+        cfg = rec.config_json
+        return cfg if isinstance(cfg, dict) else {}
+    except Exception:
+        return {}
+
+
+def _is_monitored_by_settings(cfg: Dict[str, Any], interface: str, host: str) -> bool:
+    """
+    설정된 서비스가 켜져 있으면 해당 서비스(host substring)만 모니터링.
+    - 대소문자 무시
+    - service_filters가 없으면: 모니터링 ON
+    - 해당 interface에서 enable이 하나도 없으면: 모니터링 ON(설정 미완성 방어)
+    """
+    itf = (interface or "llm").strip().lower()
+    h = (host or "").strip().lower()
+
+    sf = cfg.get("service_filters") if isinstance(cfg, dict) else None
+    if not isinstance(sf, dict):
+        return True
+
+    enabled = sf.get(itf)
+    if not isinstance(enabled, dict):
+        return True
+
+    # enable된 항목이 하나도 없으면 “필터 미적용(전부 모니터링)”으로 간주
+    if not any(bool(v) for v in enabled.values()):
+        return True
+
+    mapping = LLM_HOST_MAP if itf == "llm" else (MCP_HOST_MAP if itf == "mcp" else None)
+    if mapping is None:
+        return True
+
+    for key, substr in mapping.items():
+        if enabled.get(key) and substr in h:
+            return True
+
+    return False
+
+
+# =========================
+# 기존 유틸
+# =========================
 
 def _rebase_ai_entities_on_original(original: str, ai_ents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -88,16 +158,17 @@ def _ent_key(e: Dict[str, Any]) -> Tuple[str, int, int]:
     return (str(e.get("label", "")).upper(), int(e.get("begin", -1)), int(e.get("end", -1)))
 
 
-def _build_alert_from_merged(merged_ents: List[Dict[str, Any]],
-                             regex_src: List[Dict[str, Any]],
-                             ai_src: List[Dict[str, Any]]) -> str:
+def _build_alert_from_merged(
+    merged_ents: List[Dict[str, Any]],
+    regex_src: List[Dict[str, Any]],
+    ai_src: List[Dict[str, Any]]
+) -> str:
     """
     최종 병합된 엔티티(= 실제 마스킹/저장에 쓰이는 것) 기준으로,
     각 엔티티의 '출처'를 정규식/AI로 태깅하여 라벨을 소스별로 집계.
-    같은 라벨이라도 서로 다른 인스턴스면 각각 소스대로만 집계한다.
     """
     regex_keys = {_ent_key(e) for e in regex_src}
-    ai_keys    = {_ent_key(e) for e in ai_src}
+    ai_keys = {_ent_key(e) for e in ai_src}
 
     labels_regex: List[str] = []
     labels_ai: List[str] = []
@@ -106,18 +177,14 @@ def _build_alert_from_merged(merged_ents: List[Dict[str, Any]],
         k = _ent_key(e)
         lab = str(e.get("label", "")).upper()
         if k in regex_keys and k in ai_keys:
-            # 직렬 파이프라인 특성상 드뭄. 필요 시 한쪽만 집계.
             labels_regex.append(lab)
         elif k in regex_keys:
             labels_regex.append(lab)
         elif k in ai_keys:
             labels_ai.append(lab)
-        else:
-            # 이 케이스는 거의 없음(병합 대상은 둘 중 하나에서 온 것이니까)
-            pass
 
     only_regex = sorted(set(labels_regex))
-    only_ai    = sorted(set(labels_ai))
+    only_ai = sorted(set(labels_ai))
 
     parts = []
     if only_regex:
@@ -131,9 +198,6 @@ def _build_alert_from_merged(merged_ents: List[Dict[str, Any]],
 class DbLoggingService:
     @staticmethod
     def _serialize_attachment(att) -> Dict[str, Any] | None:
-        """
-        DB에 원본 attachment를 그대로 저장할 때 사용.
-        """
         if att is None:
             return None
         if hasattr(att, "model_dump"):
@@ -146,10 +210,6 @@ class DbLoggingService:
 
     @staticmethod
     def _get_attachment_format(att) -> Optional[str]:
-        """
-        InItem.attachment 에서 format 확장자 추출.
-        (dict / Pydantic 모델 모두 대응)
-        """
         if att is None:
             return None
         fmt = None
@@ -163,13 +223,6 @@ class DbLoggingService:
 
     @staticmethod
     def _build_response_attachment(att_src, processed_path: Optional[Path], file_changed: bool = False) -> Dict[str, Any] | None:
-        """
-        에이전트로 돌려보낼 attachment JSON 생성.
-        - format: 들어온 attachment.format 을 그대로 사용 (없으면 파일 확장자)
-        - data: 처리된 파일을 base64로 인코딩
-        - size: 처리된 파일 바이트 크기 (len(raw))
-        - file_change: 원본 파일 대비 내용 변화 여부 (bool)
-        """
         if processed_path is None or not processed_path.exists():
             return None
 
@@ -194,10 +247,21 @@ class DbLoggingService:
         return attachment_out
 
     @staticmethod
-    def _process_attachment_saved(saved: Optional[SavedFileInfo],
-                                  att_src) -> Tuple[Optional[Path], Dict[str, Any] | None]:
+    def _process_attachment_saved(
+        saved: Optional[SavedFileInfo],
+        att_src,
+        monitored: bool,
+    ) -> Tuple[Optional[Path], Dict[str, Any] | None]:
         if not saved:
             return None, None
+
+        # ✅ 서비스 미선택이면 첨부는 “원본 그대로” 반환(레댁션/디텍션 스킵)
+        if not monitored:
+            processed_path = saved.path
+            resp_attachment = DbLoggingService._build_response_attachment(
+                att_src, processed_path, file_changed=False
+            )
+            return processed_path, resp_attachment
 
         ext = (saved.ext or "").lower()
         processed_path: Optional[Path] = None
@@ -213,7 +277,6 @@ class DbLoggingService:
                     f"{saved.path.stem}.detection{saved.path.suffix}"
                 )
 
-                # ✅ 수정 핵심: detection 파일이 실제로 있을 때만 그걸 반환 + file_change=True
                 if detection_path.exists():
                     processed_path = detection_path
                     file_changed = True
@@ -224,8 +287,6 @@ class DbLoggingService:
             # 2) 이미지/스캔/PDF 등 → redaction 파이프라인
             else:
                 logger.info(f"[ATTACH] redact_saved_file: {saved.path} (ext={ext})")
-                # redact_saved_file 내부에서 레덱션 수행 후,
-                # 원본 파일 크기보다 작아지면 0x00 패딩으로 크기를 맞춰 저장하도록 구현됨.
                 red = redact_saved_file(saved)
                 logger.info(
                     f"[ATTACH] redacted result: original={red.original_path}, "
@@ -234,7 +295,6 @@ class DbLoggingService:
                 )
                 processed_path = red.redacted_path or red.original_path
 
-                # 레댁션이 실제 수행된 경우에만 '파일 내용 변화'
                 if red.redaction_performed and red.redacted_path and red.redacted_path != red.original_path:
                     file_changed = True
 
@@ -243,32 +303,11 @@ class DbLoggingService:
             processed_path = None
             file_changed = False
 
-        if processed_path is None:
-            logger.warning("[ATTACH] processed_path is None (saved=%s)", saved.path)
-        else:
-            logger.info(
-                "[ATTACH] processed_path exists=%s -> %s",
-                processed_path.exists(),
-                processed_path,
-            )
-
         resp_attachment = DbLoggingService._build_response_attachment(
             att_src,
             processed_path,
             file_changed=file_changed,
         )
-        if resp_attachment is None:
-            logger.warning(
-                "[ATTACH] response_attachment is None (processed_path=%s)",
-                processed_path,
-            )
-        else:
-            logger.info(
-                "[ATTACH] response_attachment built (size=%s, file_change=%s)",
-                resp_attachment.get("size"),
-                resp_attachment.get("file_change"),
-            )
-
         return processed_path, resp_attachment
 
     @staticmethod
@@ -276,191 +315,209 @@ class DbLoggingService:
         t0 = time.perf_counter()
         request_id = str(uuid.uuid4())
 
-        # 1) 첨부 저장 (SavedFileInfo | None)
-        #    => 원본 파일은 항상 저장 (민감 여부와 무관)
+        # ✅ Settings 로드 + 서비스 모니터링 여부 결정
+        cfg = _load_settings_config(db)
+        interface = item.interface or "llm"
+        host = item.host or ""
+        monitored = _is_monitored_by_settings(cfg, interface, host)
+
+        # 1) 첨부 저장 (SavedFileInfo | None) => 원본 파일은 항상 저장
         saved_info: Optional[SavedFileInfo] = save_attachment_file(item)
 
-        # 1-1) 첨부 파일 redaction/detection 수행 + 에이전트로 돌려보낼 attachment 준비
+        # 1-1) 첨부 파일 처리 + 응답 attachment 준비 (모니터링 OFF면 원본 그대로)
         processed_path: Optional[Path]
         response_attachment: Dict[str, Any] | None
         processed_path, response_attachment = DbLoggingService._process_attachment_saved(
-            saved_info, item.attachment
+            saved_info, item.attachment, monitored=monitored
         )
 
-        # similarity 체크용 path/mime 분리
         saved_path: Optional[Path] = saved_info.path if saved_info else None
         saved_mime: Optional[str] = saved_info.mime if saved_info else None
 
-        # 2) OCR (이미지 유사도 차단 / 파일 내 텍스트 민감도 판정에 사용)
-        ocr_text, ocr_used, _ = OcrService.run_ocr(item)
+        # 2) OCR (모니터링 OFF면 스킵)
+        if monitored:
+            ocr_text, ocr_used, _ = OcrService.run_ocr(item)
+        else:
+            ocr_text, ocr_used = "", False
 
-        # (강화) OCR 텍스트에도 정규식 적용 (원문 OCR + 수사치환 OCR 2회 탐지 후 병합)
-        if ocr_used and ocr_text:
-            # 1) 원문 OCR 기반 탐지
+        # (강화) OCR 텍스트에도 정규식 적용 (모니터링 ON일 때만)
+        if monitored and ocr_used and ocr_text:
             try:
                 regex_ents_ocr_raw = regex_detect(ocr_text)
             except Exception:
                 regex_ents_ocr_raw = []
 
-            # 2) 수사 치환 OCR 기반 탐지
             ocr_norm = normalize_obfuscated_numbers(ocr_text)
             try:
                 regex_ents_ocr_norm = regex_detect(ocr_norm)
             except Exception:
                 regex_ents_ocr_norm = []
 
-            # 2-1) norm 탐지 결과의 value를 OCR "원문" 기준으로 복구
             for e in regex_ents_ocr_norm:
                 b, en = int(e.get("begin", -1)), int(e.get("end", -1))
                 if 0 <= b < en <= len(ocr_text):
                     e["value"] = ocr_text[b:en]
 
-            # 3) 병합 (원문 OCR 탐지 우선)
             regex_ents_ocr = _dedup_spans(regex_ents_ocr_raw, regex_ents_ocr_norm)
         else:
             regex_ents_ocr = []
 
-        # === 파일 내 민감정보 플래그 ===
         file_has_sensitive = bool(regex_ents_ocr)
 
-        # 3) 정규식 1차 감지 (원문 + 수사치환본 2회 탐지 후 병합)
+        # 3) 프롬프트
         prompt_text = item.prompt or ""
 
-        # 3-1) 원문 기반 탐지
-        try:
-            regex_ents_prompt_raw: List[Dict[str, Any]] = regex_detect(prompt_text)
-        except Exception:
-            regex_ents_prompt_raw = []
+        # ✅ 모니터링 OFF면 프롬프트 탐지/AI/마스킹 스킵
+        if not monitored:
+            regex_ents_prompt: List[Dict[str, Any]] = []
+            ai_ents_rebased: List[Dict[str, Any]] = []
+            prompt_entities: List[Dict[str, Any]] = []
 
-        # 3-2) 수사 치환본 기반 탐지
-        prompt_norm = normalize_obfuscated_numbers(prompt_text)
-        try:
-            regex_ents_prompt_norm: List[Dict[str, Any]] = regex_detect(prompt_norm)
-        except Exception:
-            regex_ents_prompt_norm = []
-
-        # 3-3) norm 탐지 결과의 value를 "원문 슬라이스"로 복구 (begin/end는 길이 동일이라 그대로 사용 가능)
-        for e in regex_ents_prompt_norm:
-            b, en = int(e.get("begin", -1)), int(e.get("end", -1))
-            if 0 <= b < en <= len(prompt_text):
-                e["value"] = prompt_text[b:en]
-
-        # 3-4) 두 결과 병합 (원문 탐지 우선)
-        regex_ents_prompt = _dedup_spans(regex_ents_prompt_raw, regex_ents_prompt_norm)
-
-        # 4) AI 입력용 마스킹(정규식 결과로만 라벨링, 괄호 포함)
-        masked_for_ai = mask_with_parens_by_entities(
-            prompt_text,
-            [Entity(**e) for e in regex_ents_prompt if set(e).issuperset({"label", "value", "begin", "end"})]
-        )
-
-        # 5) AI 보완 탐지 — 힌트 라벨 없이, 마스킹된 프롬프트만 전달
-        try:
-            det_ai = _DETECTOR.analyze_text(masked_for_ai, return_spans=False)
-        except Exception:
             det_ai = {"has_sensitive": False, "entities": [], "processing_ms": 0}
+            ai_ms = 0
 
-        ai_raw_ents = det_ai.get("entities", []) or []
-        ai_ms = int(det_ai.get("processing_ms", 0) or 0)
+            has_sensitive = False
+            file_has_sensitive = False  # 첨부도 스킵했으니 민감도 반영 안 함
+            file_blocked = False
+            allow = True
+            action = "allow_unmonitored"
 
-        # 6) AI 결과를 원문 기준 스팬으로 재계산 → 정규식 결과와 병합
-        ai_ents_rebased = _rebase_ai_entities_on_original(prompt_text, ai_raw_ents)
-        prompt_entities = _dedup_spans(regex_ents_prompt, ai_ents_rebased)
+            final_modified_prompt = prompt_text
+            alert_text = ""
 
-        # OCR에서 정규식으로 잡힌 것들도 민감도 판정에 반영(표시는 프롬프트만)
-        has_sensitive = bool(
-            prompt_entities
-            or regex_ents_ocr
-            or bool(det_ai.get("has_sensitive"))
-        )
-
-        # 7) 정책결정 (파일 민감정보 + 이미지 유사도 포함)
-        file_blocked = bool(file_has_sensitive)
-        allow = True  # 기본은 요청 자체는 허용 (마스킹/레댁션 전제)
-
-        # 프롬프트 또는 파일 중 하나라도 민감하면 mask_and_allow
-        if prompt_entities or file_has_sensitive:
-            action = "mask_and_allow"
         else:
-            action = "allow"
-
-        # 이미지 유사도에 따른 추가 차단 (관리자 템플릿과 유사한 이미지)
-        if (
-            saved_mime
-            and saved_mime.startswith("image/")
-            and ocr_used
-            and (not ocr_text or len(ocr_text.strip()) < 3)
-        ):
+            # 3-1) 원문 기반 탐지
             try:
-                if saved_path and ADMIN_IMAGE_DIR.exists():
-                    score, _ = best_similarity_against_folder(saved_path, ADMIN_IMAGE_DIR)
-                    if score >= SIMILARITY_THRESHOLD:
-                        file_blocked = True
-                        allow = False
-                        action = "block_upload_similar"
+                regex_ents_prompt_raw: List[Dict[str, Any]] = regex_detect(prompt_text)
             except Exception:
-                pass
+                regex_ents_prompt_raw = []
 
-        # 8) 최종 마스킹(정규식 + AI 보완 엔티티 모두 반영, 괄호 없음)
-        final_modified_prompt = mask_by_entities(
-            prompt_text,
-            [Entity(**e) for e in prompt_entities if set(e).issuperset({"label", "value", "begin", "end"})]
-        )
+            # 3-2) 수사 치환본 기반 탐지
+            prompt_norm = normalize_obfuscated_numbers(prompt_text)
+            try:
+                regex_ents_prompt_norm: List[Dict[str, Any]] = regex_detect(prompt_norm)
+            except Exception:
+                regex_ents_prompt_norm = []
 
-        # 9) alert(근거) 생성 — 최종 병합 결과 기준으로 출처 집계
-        alert_text = _build_alert_from_merged(
-            merged_ents=prompt_entities,
-            regex_src=regex_ents_prompt,
-            ai_src=ai_ents_rebased,
-        )
-        if not alert_text and prompt_entities:
-            labels = sorted({e["label"] for e in prompt_entities})
-            if labels:
-                alert_text = f"Detected: {', '.join(labels)}"
+            # 3-3) norm 탐지 결과 value 복구
+            for e in regex_ents_prompt_norm:
+                b, en = int(e.get("begin", -1)), int(e.get("end", -1))
+                if 0 <= b < en <= len(prompt_text):
+                    e["value"] = prompt_text[b:en]
 
-        # 전체 처리시간 (AI 처리시간도 포함해 최소값 보정)
-        processing_ms = max(int((time.perf_counter() - t0) * 1000), ai_ms)
+            # 3-4) 병합
+            regex_ents_prompt = _dedup_spans(regex_ents_prompt_raw, regex_ents_prompt_norm)
 
-        # hostname 우선, 없으면 pc_name 대체 (schemas가 별칭 처리)
+            # 4) AI 입력용 마스킹(정규식 결과만, 괄호 포함)
+            masked_for_ai = mask_with_parens_by_entities(
+                prompt_text,
+                [Entity(**e) for e in regex_ents_prompt if set(e).issuperset({"label", "value", "begin", "end"})]
+            )
+
+            # 5) AI 보완 탐지
+            try:
+                det_ai = _DETECTOR.analyze_text(masked_for_ai, return_spans=False)
+            except Exception:
+                det_ai = {"has_sensitive": False, "entities": [], "processing_ms": 0}
+
+            ai_raw_ents = det_ai.get("entities", []) or []
+            ai_ms = int(det_ai.get("processing_ms", 0) or 0)
+
+            # 6) AI 결과를 원문 기준 스팬으로 재계산 → 정규식 결과와 병합
+            ai_ents_rebased = _rebase_ai_entities_on_original(prompt_text, ai_raw_ents)
+            prompt_entities = _dedup_spans(regex_ents_prompt, ai_ents_rebased)
+
+            has_sensitive = bool(
+                prompt_entities
+                or regex_ents_ocr
+                or bool(det_ai.get("has_sensitive"))
+            )
+
+            # 7) 정책결정
+            file_blocked = bool(file_has_sensitive)
+            allow = True
+
+            if prompt_entities or file_has_sensitive:
+                action = "mask_and_allow"
+            else:
+                action = "allow"
+
+            # 이미지 유사도 차단(기존 로직 유지)
+            if (
+                saved_mime
+                and saved_mime.startswith("image/")
+                and ocr_used
+                and (not ocr_text or len(ocr_text.strip()) < 3)
+            ):
+                try:
+                    if saved_path and ADMIN_IMAGE_DIR.exists():
+                        score, _ = best_similarity_against_folder(saved_path, ADMIN_IMAGE_DIR)
+                        if score >= SIMILARITY_THRESHOLD:
+                            file_blocked = True
+                            allow = False
+                            action = "block_upload_similar"
+                except Exception:
+                    pass
+
+            # 8) 최종 마스킹(정규식 + AI 보완 엔티티, 괄호 없음)
+            final_modified_prompt = mask_by_entities(
+                prompt_text,
+                [Entity(**e) for e in prompt_entities if set(e).issuperset({"label", "value", "begin", "end"})]
+            )
+
+            # 9) alert 생성
+            alert_text = _build_alert_from_merged(
+                merged_ents=prompt_entities,
+                regex_src=regex_ents_prompt,
+                ai_src=ai_ents_rebased,
+            )
+            if not alert_text and prompt_entities:
+                labels = sorted({e["label"] for e in prompt_entities})
+                if labels:
+                    alert_text = f"Detected: {', '.join(labels)}"
+
+        # 처리시간
+        processing_ms = max(int((time.perf_counter() - t0) * 1000), int(ai_ms or 0))
+
         host_name = item.hostname or item.pc_name
 
         # 10) DB 저장
         rec = LogRecord(
-            request_id      = request_id,
-            time            = item.time,
-            public_ip       = item.public_ip,
-            private_ip      = item.private_ip,
-            host            = item.host or "unknown",
-            hostname        = host_name,
-            prompt          = prompt_text,
-            attachment      = DbLoggingService._serialize_attachment(item.attachment),
-            interface       = item.interface or "llm",
+            request_id=request_id,
+            time=item.time,
+            public_ip=item.public_ip,
+            private_ip=item.private_ip,
+            host=item.host or "unknown",
+            hostname=host_name,
+            prompt=prompt_text,
+            attachment=DbLoggingService._serialize_attachment(item.attachment),
+            interface=item.interface or "llm",
 
-            modified_prompt = final_modified_prompt,
-            has_sensitive   = has_sensitive,
-            entities        = [dict(e) for e in prompt_entities],
-            processing_ms   = processing_ms,
+            modified_prompt=final_modified_prompt,
+            has_sensitive=bool(has_sensitive),
+            entities=[dict(e) for e in (prompt_entities or [])],
+            processing_ms=processing_ms,
 
-            file_blocked    = file_blocked,
-            allow           = allow,
-            action          = action,
+            file_blocked=bool(file_blocked),
+            allow=bool(allow),
+            action=str(action),
         )
         LogRepository.create(db, rec)
 
         # 11) 응답
         return ServerOut(
-            request_id      = request_id,
-            host            = rec.host,
-            modified_prompt = rec.modified_prompt,
-            has_sensitive   = rec.has_sensitive,
-            entities        = [
-                Entity(**e) for e in rec.entities
+            request_id=rec.request_id,
+            host=rec.host,
+            modified_prompt=rec.modified_prompt,
+            has_sensitive=rec.has_sensitive,
+            entities=[
+                Entity(**e) for e in (rec.entities or [])
                 if isinstance(e, dict) and set(e).issuperset({"value", "begin", "end", "label"})
             ],
-            processing_ms   = rec.processing_ms,
-            file_blocked    = rec.file_blocked,
-            allow           = rec.allow,
-            action          = rec.action,
-            alert           = alert_text,
-            attachment      = response_attachment,
+            processing_ms=rec.processing_ms,
+            file_blocked=rec.file_blocked,
+            allow=rec.allow,
+            action=rec.action,
+            alert=alert_text if monitored else "",
+            attachment=response_attachment,
         )

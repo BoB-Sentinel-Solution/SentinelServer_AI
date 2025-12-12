@@ -1,4 +1,10 @@
 # models.py
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from typing import Any, Dict
+
 from sqlalchemy import Column, String, Boolean, Integer, DateTime, JSON, Text
 from sqlalchemy.sql import func
 from db import Base
@@ -39,10 +45,11 @@ class LogRecord(Base):
     created_at      = Column(DateTime(timezone=True), default=datetime.now, nullable=False)
 
     # Reason 페이지용 추가 정보
-    reason = Column(Text, nullable=True)          # 한 줄 분석 결과
-    reason_type = Column(String(32), nullable=True)   # "intentional" / "negligent" / "unknown"
-    risk_category = Column(String(64), nullable=True) # 예: "신원 정보 유출"
-    risk_pattern = Column(String(128), nullable=True) # 예: "NAME + PHONE + ADDRESS"
+    reason = Column(Text, nullable=True)                # 한 줄 분석 결과
+    reason_type = Column(String(32), nullable=True)     # "intentional" / "negligent" / "unknown"
+    risk_category = Column(String(64), nullable=True)   # 예: "신원 정보 유출"
+    risk_pattern = Column(String(128), nullable=True)   # 예: "NAME + PHONE + ADDRESS"
+
 
 class McpConfigEntry(Base):
     """
@@ -87,3 +94,46 @@ class McpConfigEntry(Base):
 
     # 메타
     created_at  = Column(DateTime(timezone=True), default=datetime.now, nullable=False)
+
+
+class SettingsRecord(Base):
+    """
+    Settings 단일 레코드(보통 id=1만 사용)
+    - config_json: settings 전체를 JSON(dict)로 저장
+    - version: 낙관적 락/동시 수정 감지용
+    """
+    __tablename__ = "settings"
+
+    id = Column(Integer, primary_key=True)  # 항상 1 사용 권장
+    config_json = Column(JSON, nullable=False, default=dict)
+    version = Column(Integer, nullable=False, default=1)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=datetime.now,
+        onupdate=datetime.now,  # ✅ 업데이트 시 자동 갱신
+        nullable=False,
+    )
+
+    def get_config(self) -> Dict[str, Any]:
+        """
+        JSON 컬럼이면 보통 dict로 들어오지만,
+        혹시 문자열이 들어간 케이스까지 방어.
+        """
+        v = self.config_json
+        if v is None:
+            return {}
+        if isinstance(v, dict):
+            return v
+        if isinstance(v, str):
+            try:
+                return json.loads(v) or {}
+            except Exception:
+                return {}
+        return {}
+
+    def set_config(self, cfg: Dict[str, Any]) -> None:
+        """
+        JSON 컬럼이므로 dict 그대로 저장.
+        """
+        self.config_json = cfg or {}
+        self.updated_at = datetime.now()

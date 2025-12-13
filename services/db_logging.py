@@ -429,16 +429,64 @@ class DbLoggingService:
                 or bool(det_ai.get("has_sensitive"))
             )
 
-            # 7) 정책결정(7~8수정필요)
-            file_blocked = bool(file_has_sensitive)
+            # 7) 정책결정
+            # - settings.config_json 의 response_method 를 실제 allow/action에 반영
+            #   * mask  : 민감 시 마스킹 후 허용
+            #   * allow : 민감 시 원문 그대로 허용
+            #   * block : 민감 시 차단(allow=False)
+            response_method = (cfg.get("response_method") or "mask").strip().lower()
+
+            # 파일 민감 탐지는 "민감 여부"로만 두고,
+            # 실제 차단 여부(file_blocked)는 action/allow와 일치하게 운용한다.
+            file_sensitive = bool(file_has_sensitive)
+            file_blocked = False
             allow = True
 
-            if prompt_entities or file_has_sensitive:
-                action = "mask_and_allow"
-            else:
-                action = "allow"
+            # 민감 여부(프롬프트/파일/OCR/AI 플래그 포함)
+            sensitive_any = bool(
+                prompt_entities
+                or regex_ents_ocr
+                or bool(det_ai.get("has_sensitive"))
+            )
 
-            # 이미지 유사도 차단(기존 로직 유지)
+            # 기본값
+            action = "allow"
+
+            if sensitive_any:
+                if response_method == "block":
+                    allow = False
+                    action = "block_sensitive"
+                    # block 모드에서도 응답에 원문을 그대로 주면 위험하니 마스킹된 프롬프트를 내려주는 편이 안전
+                    final_modified_prompt = mask_by_entities(
+                        prompt_text,
+                        [Entity(**e) for e in prompt_entities if set(e).issuperset({"label", "value", "begin", "end"})]
+                    )
+                    # 파일에서 민감이 탐지된 경우 "파일 차단"으로도 표시
+                    if file_sensitive:
+                        file_blocked = True
+                        action = "block_file_sensitive"
+
+                elif response_method == "allow":
+                    allow = True
+                    action = "allow_sensitive"
+                    # allow 모드에서는 원문 그대로
+                    final_modified_prompt = prompt_text
+
+                else:
+                    # 기본: mask
+                    allow = True
+                    action = "mask_and_allow"
+                    final_modified_prompt = mask_by_entities(
+                        prompt_text,
+                        [Entity(**e) for e in prompt_entities if set(e).issuperset({"label", "value", "begin", "end"})]
+                    )
+            else:
+                # 민감 없음
+                allow = True
+                action = "allow"
+                final_modified_prompt = prompt_text
+
+            # 이미지 유사도 차단(기존 로직 유지) — response_method보다 우선 차단됨
             if (
                 saved_mime
                 and saved_mime.startswith("image/")
@@ -456,10 +504,12 @@ class DbLoggingService:
                     pass
 
             # 8) 최종 마스킹(정규식 + AI 보완 엔티티, 괄호 없음)
-            final_modified_prompt = mask_by_entities(
-                prompt_text,
-                [Entity(**e) for e in prompt_entities if set(e).issuperset({"label", "value", "begin", "end"})]
-            )
+            # - 위 정책결정에서 final_modified_prompt를 이미 결정했으므로 여기서는 재마스킹하지 않음
+            #   (중복 마스킹/불필요 계산 방지)
+            # final_modified_prompt = mask_by_entities(
+            #     prompt_text,
+            #     [Entity(**e) for e in prompt_entities if set(e).issuperset({"label", "value", "begin", "end"})]
+            # )
 
             # 9) alert 생성
             alert_text = _build_alert_from_merged(

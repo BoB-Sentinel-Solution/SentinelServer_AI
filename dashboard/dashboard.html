@@ -205,7 +205,7 @@
         <!-- 최근 개인정보(식별대상) 입력 시도 횟수 -->
         <div class="card card-recent-attempts">
           <div class="card-header">
-            <h3 class="card-title">외부 LLM 서비스 사용 횟수(최근 7일)</h3>
+            <h3 class="card-title">외부 AI 서비스 접근 횟수(최근 일주일)</h3>
           </div>
           <canvas id="chart-recent-attempts" height="150"></canvas>
         </div>
@@ -215,6 +215,7 @@
           <div class="card-header card-header--today">
             <div>
               <div class="badge">TODAY'S DETECTION</div>
+              <!-- 한글로 통일 당일 탐지 현황,내역 등-->
               <div class="today-metrics">
                 <span><strong id="today-detected">-</strong> 중요정보 탐지</span>
                 <span><strong id="today-blocked">-</strong> 차단</span>
@@ -249,7 +250,8 @@
         <!-- 탐지된 중요 정보 유형 비율 -->
         <div class="card card-type-ratio">
           <div class="card-header">
-            <h3 class="card-title">전체 탐지된 중요 정보 유형 비율</h3>
+            <h3 class="card-title">탐지된 중요 정보 유형</h3>
+            <!-- 숫자 넣기 -->
           </div>
           <canvas id="chart-type-ratio" height="180"></canvas>
         </div>

@@ -720,12 +720,12 @@
   color: #283152;
 }
 
-/* 현재 페이지 링크 (굵게 + 흰 배경 + 그림자) */
+/* 현재 페이지 링크 (흰색 없이 텍스트만 강조) */
 .side-link--active {
-  background: #ffffff;
+  background: transparent;
+  box-shadow: none;
   color: #1b2340;
   font-weight: 700;
-  box-shadow: 0 1px 3px rgba(30, 50, 120, 0.18);
 }
 
 /* 우측 컨텐츠 영역 */

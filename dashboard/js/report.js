@@ -328,12 +328,12 @@ function renderInfoTrendCompare(summary) {
       labels,
       datasets: [
         {
-          label: "오늘 탐지",
+          label: "중요정보 탐지 프롬프트",
           data: todayData,
           stack: "stack1",
         },
         {
-          label: "기타 요청",
+          label: "정상 프롬프토",
           data: otherData,
           stack: "stack1",
         },

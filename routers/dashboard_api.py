@@ -1077,7 +1077,7 @@ def report_llm_file_summary(
     for r in rows:
         # --- attachment 파싱 (TEXT/JSON → dict 통일) ---
         att = _parse_attachment(r.attachment)
-        ext = (att.get("format") or "unknown").strip().lower()
+        ext = (att.get("format") or "TEXT").strip().lower()
 
         # 도넛 카운트
         donut_counts[ext] += 1

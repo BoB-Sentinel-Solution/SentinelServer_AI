@@ -52,12 +52,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnLogout = document.getElementById("btn-logout");
 
   const apiModule = window.SentinelApi || window.SentinelAPI || {};
-  const getAdminKey =
-    apiModule.getAdminKey || window.getAdminKey || (() => "");
-  const setAdminKey =
-    apiModule.setAdminKey || window.setAdminKey || (() => {});
-  const fetchLogs =
-    apiModule.fetchLogs || window.fetchLogs || null;
+  const getAdminKey = apiModule.getAdminKey || window.getAdminKey || (() => "");
+  const setAdminKey = apiModule.setAdminKey || window.setAdminKey || (() => {});
+  const fetchLogs = apiModule.fetchLogs || window.fetchLogs || null;
 
   // --------------- 상단 UPDATED 시계 ---------------
   function pad(n) {
@@ -67,10 +64,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateClock() {
     const now = new Date();
     if (updatedAtEl) {
-      updatedAtEl.textContent =
-        `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(
-          now.getSeconds()
-        )} KST`;
+      updatedAtEl.textContent = `${pad(now.getHours())}:${pad(
+        now.getMinutes()
+      )}:${pad(now.getSeconds())} KST`;
     }
   }
   updateClock();
@@ -259,23 +255,28 @@ function buildDailyStats(logs) {
       dayStats[dayKey] = {
         total: 0,
         sensitive: 0,
-        hosts: {}, // hostKey -> { total, sensitive }
+        hosts: {}, // pairKey -> { host, pc, total, sensitive }
         labels: {}, // label -> count
       };
     }
     const stat = dayStats[dayKey];
     stat.total += 1;
 
-    const hostKeyRaw = log.host || log.hostname || "UNKNOWN";
-    const hostKey = hostKeyRaw && hostKeyRaw.trim() ? hostKeyRaw.trim() : "UNKNOWN";
-    if (!stat.hosts[hostKey]) {
-      stat.hosts[hostKey] = { total: 0, sensitive: 0 };
+    // ---- (수정) host/pc 분리 후 pairKey로 집계 ----
+    const host = (log.host || "UNKNOWN").trim() || "UNKNOWN";
+    const pc =
+      (log.hostname || log.PCName || log.pc_name || "UNKNOWN").trim() ||
+      "UNKNOWN";
+    const pairKey = `${host}|||${pc}`;
+
+    if (!stat.hosts[pairKey]) {
+      stat.hosts[pairKey] = { host, pc, total: 0, sensitive: 0 };
     }
-    stat.hosts[hostKey].total += 1;
+    stat.hosts[pairKey].total += 1;
 
     if (log.has_sensitive) {
       stat.sensitive += 1;
-      stat.hosts[hostKey].sensitive += 1;
+      stat.hosts[pairKey].sensitive += 1;
 
       const ents = Array.isArray(log.entities) ? log.entities : [];
       ents.forEach((e) => {
@@ -302,8 +303,7 @@ function buildDailyStats(logs) {
   last7Keys.forEach((k) => {
     sumSensitive += dayStats[k].sensitive || 0;
   });
-  const avg7dSensitive =
-    last7Keys.length > 0 ? sumSensitive / last7Keys.length : 0;
+  const avg7dSensitive = last7Keys.length > 0 ? sumSensitive / last7Keys.length : 0;
 
   return {
     todayKey,
@@ -333,11 +333,7 @@ function renderTodayRisk(stats) {
   const T_total_today = todayStat.total || 0;
   const T_avg7d = avg7dSensitive;
 
-  const { score1, score2, finalScore } = computeScores(
-    T_today,
-    T_avg7d,
-    T_total_today
-  );
+  const { score1, score2, finalScore } = computeScores(T_today, T_avg7d, T_total_today);
 
   // DOM 엘리먼트
   const valueEl = document.getElementById("risk-score-value");
@@ -356,9 +352,7 @@ function renderTodayRisk(stats) {
 
   if (valueEl) valueEl.textContent = String(finalScore);
   if (todaySensitiveEl) todaySensitiveEl.textContent = String(T_today);
-  if (avg7dEl)
-    avg7dEl.textContent =
-      last7Keys.length > 0 ? avg7dSensitive.toFixed(1) : "-";
+  if (avg7dEl) avg7dEl.textContent = last7Keys.length > 0 ? avg7dSensitive.toFixed(1) : "-";
   if (todayTotalEl) todayTotalEl.textContent = String(T_total_today);
 
   if (todayRatioEl) {
@@ -467,9 +461,7 @@ function render7dTrafficChart(stats) {
   });
 
   const totalValues = last7Keys.map((k) => dayStats[k].total || 0);
-  const sensitiveValues = last7Keys.map(
-    (k) => dayStats[k].sensitive || 0
-  );
+  const sensitiveValues = last7Keys.map((k) => dayStats[k].sensitive || 0);
 
   if (score7dTrafficChart) {
     score7dTrafficChart.destroy();
@@ -541,16 +533,16 @@ function renderTopHostsToday(stats) {
 
   const todayStat = stats.dayStats[stats.todayKey];
   if (!todayStat || todayStat.total === 0) {
-    tbody.innerHTML =
-      '<tr><td colspan="5">오늘 기록된 로그가 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5">오늘 기록된 로그가 없습니다.</td></tr>';
     return;
   }
 
-  const rows = Object.entries(todayStat.hosts).map(([hostKey, val]) => {
+  // ---- (수정) hosts가 pairKey -> {host, pc, total, sensitive} 형태 ----
+  const rows = Object.values(todayStat.hosts).map((val) => {
     const total = val.total || 0;
     const sens = val.sensitive || 0;
     const ratio = total > 0 ? sens / total : 0;
-    return { hostKey, total, sens, ratio };
+    return { host: val.host, pc: val.pc, total, sens, ratio };
   });
 
   rows.sort((a, b) => {
@@ -562,8 +554,7 @@ function renderTopHostsToday(stats) {
   const top = rows.slice(0, 5);
 
   if (!top.length) {
-    tbody.innerHTML =
-      '<tr><td colspan="5">오늘 탐지된 로그가 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5">오늘 탐지된 로그가 없습니다.</td></tr>';
     return;
   }
 
@@ -571,15 +562,14 @@ function renderTopHostsToday(stats) {
   top.forEach((row, idx) => {
     const tr = document.createElement("tr");
 
-    const pcName =
-      row.hostKey === "UNKNOWN" ? "-" : row.hostKey; // host+pc 분리 정보가 없으므로 hostKey만 사용
+    const pcName = row.pc === "UNKNOWN" ? "-" : row.pc;
 
     const ratioPct = row.total
       ? ((row.sens / row.total) * 100).toFixed(1) + "%"
       : "-";
 
     appendCell(tr, String(idx + 1));
-    appendCell(tr, row.hostKey);
+    appendCell(tr, row.host);
     appendCell(tr, pcName);
     appendCell(tr, String(row.sens));
     appendCell(tr, ratioPct);
@@ -596,15 +586,13 @@ function renderTopLabelsToday(stats) {
 
   const todayStat = stats.dayStats[stats.todayKey];
   if (!todayStat || !todayStat.labels) {
-    tbody.innerHTML =
-      '<tr><td colspan="4">오늘 탐지된 중요정보 LABEL이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4">오늘 탐지된 중요정보 LABEL이 없습니다.</td></tr>';
     return;
   }
 
   const entries = Object.entries(todayStat.labels);
   if (!entries.length) {
-    tbody.innerHTML =
-      '<tr><td colspan="4">오늘 탐지된 중요정보 LABEL이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4">오늘 탐지된 중요정보 LABEL이 없습니다.</td></tr>';
     return;
   }
 
@@ -633,8 +621,7 @@ function renderHighRiskTimeline(stats) {
 
   const high = stats.highRiskLogsToday || [];
   if (!high.length) {
-    tbody.innerHTML =
-      '<tr><td colspan="7">오늘 고위험 이벤트가 아직 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">오늘 고위험 이벤트가 아직 없습니다.</td></tr>';
     return;
   }
 

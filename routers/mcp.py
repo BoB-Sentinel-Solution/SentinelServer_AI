@@ -11,7 +11,6 @@ router = APIRouter()
 # 간단 자동 생성 (운영은 Alembic 권장)
 Base.metadata.create_all(bind=engine)
 
-
 def get_db():
     db = SessionLocal()
     try:
@@ -22,7 +21,6 @@ def get_db():
         raise
     finally:
         db.close()
-
 
 @router.post("/mcp", response_model=McpInResponse)
 def mcp_config(item: McpInItem, db: Session = Depends(get_db)) -> McpInResponse:

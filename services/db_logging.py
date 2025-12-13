@@ -429,7 +429,7 @@ class DbLoggingService:
                 or bool(det_ai.get("has_sensitive"))
             )
 
-            # 7) 정책결정
+            # 7) 정책결정(7~8수정필요)
             file_blocked = bool(file_has_sensitive)
             allow = True
 

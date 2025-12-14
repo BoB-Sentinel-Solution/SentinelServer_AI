@@ -29,7 +29,7 @@ echo "[CONF] DOMAIN=${DOMAIN}, WWW_DOMAIN=${WWW_DOMAIN}, APP_DST=${APP_DST}, TZ=
 
 echo "[SYS] base packages"
 apt-get update -y
-apt-get install -y python3-venv python3-pip rsync curl openssl certbot gettext-base
+apt-get install -y python3-venv python3-pip rsync curl openssl certbot gettext-base tesseract-ocr tesseract-ocr-kor tesseract-ocr-eng
 
 # 타임존/방화벽 유지 호출 (있을 때만)
 [[ -x "${BASE_DIR}/scripts/setup_timezone.sh" ]]  && bash "${BASE_DIR}/scripts/setup_timezone.sh"  || timedatectl set-timezone "${TZ_NAME}" || true

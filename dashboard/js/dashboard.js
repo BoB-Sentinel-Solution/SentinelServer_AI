@@ -117,12 +117,19 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // 3) IP 대역별 탐지 건수 (수평 bar)
+    // ✅ 3) 전체 중요정보 유형 TOP 5 (수평 bar)  ※ 기존 IP대역 차트 자리 그대로 사용
     const ctxIp = document.getElementById("chart-ip-band")?.getContext("2d");
     if (ctxIp) {
-      const ipBand = summary.ip_band_detected || {};
-      const labels = Object.keys(ipBand);
-      const data = Object.values(ipBand);
+      const typeRatio = summary.type_ratio || {};
+
+      // {LABEL: count} → [[label, count], ...] 정렬 후 TOP 5
+      const top5 = Object.entries(typeRatio)
+        .filter(([, v]) => typeof v === "number")
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+
+      const labels = top5.map(([k]) => k);
+      const data = top5.map(([, v]) => v);
 
       if (chartIpBand) chartIpBand.destroy();
       chartIpBand = new Chart(ctxIp, {

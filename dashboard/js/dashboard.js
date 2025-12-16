@@ -254,7 +254,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // 8) 로그 테이블 (Top 10)
+    // 8) 로그 테이블 (Top 10)  ✅ 컬럼: 시간 / 서비스명 / PC이름 / Public IP / Internal IP / 처리결과 / 탐지정보내역
     if (logTableBody) {
       logTableBody.innerHTML = "";
       const logs = summary.recent_logs || [];
@@ -266,9 +266,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const pcName = log.hostname || log.pc_name || "-";
         const publicIp = log.public_ip || "-";
         const internalIp = log.internal_ip || "-";
-        const action = log.action || "-";
-        const blocked =
-          log.allow === false || log.action === "block" ? "Y" : "N";
+
+        // 처리 결과: allow → 접속 허용 (그 외엔 기존 action 표시)
+        let result = "-";
+        if (log.allow === true || log.allow === false) {
+          result = log.allow ? "접속 허용" : "차단";
+        } else if (log.action) {
+          result = log.action;
+        }
+
         const labels =
           (log.entities || [])
             .map((e) => e.label || e.type)
@@ -281,8 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <td>${pcName}</td>
           <td>${publicIp}</td>
           <td>${internalIp}</td>
-          <td>${action}</td>
-          <td>${blocked}</td>
+          <td>${result}</td>
           <td>${labels}</td>
         `;
         logTableBody.appendChild(tr);

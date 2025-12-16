@@ -2,7 +2,7 @@
 
 // 전역 Chart 인스턴스 보관 (리프레시 시 destroy 용)
 let chartInfoRatio = null;
-let chartInfoStats = null;
+// let chartInfoStats = null; // ✅ 유형1 카드 제거로 불필요
 let chartInfoTypes = null;
 let chartInfoTrendWeek = null;
 let chartInfoTrendCompare = null;
@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const summary = await window.SentinelApi.get("/summary?interface=LLM");
 
       renderInfoRatio(summary);
-      renderInfoStats(summary);
+      // renderInfoStats(summary); // ✅ 유형1 카드 제거로 호출 제거
       renderInfoTypes(summary);
       renderInfoTrend(summary);
       renderInfoTrendCompare(summary);
@@ -166,52 +166,6 @@ function renderInfoRatio(summary) {
               }
               return `${label}: ${value}건`;
             },
-          },
-        },
-      },
-    },
-  });
-}
-
-// 2) 중요정보 탐지 통계 (라벨별 Bar 차트)
-function renderInfoStats(summary) {
-  const ctx = document.getElementById("chart-info-stats");
-  if (!ctx) return;
-
-  const typeRatio = summary.type_ratio || {};
-  const labels = Object.keys(typeRatio);
-  const data = labels.map((k) => typeRatio[k] || 0);
-
-  if (chartInfoStats) chartInfoStats.destroy();
-
-  chartInfoStats = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "탐지 횟수",
-          data,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          ticks: { autoSkip: false, maxRotation: 60, minRotation: 30 },
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { precision: 0 },
-        },
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => `${ctx.parsed.y}건`,
           },
         },
       },
@@ -333,7 +287,7 @@ function renderInfoTrendCompare(summary) {
           stack: "stack1",
         },
         {
-          label: "정상 프롬프토",
+          label: "정상 프롬프트", // ✅ 오타 수정
           data: otherData,
           stack: "stack1",
         },

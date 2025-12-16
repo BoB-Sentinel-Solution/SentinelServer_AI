@@ -55,7 +55,7 @@
             <div class="side-group">
               <div class="side-group-title">| OVERALL</div>
               <a class="side-link side-link--active" href="./report.html">탐지된 프롬프트 비율</a>
-              <a class="side-link" href="./report.html#stats">중요정보 탐지 통계</a>
+              <!-- ✅ stats 카드 제거했으니 링크도 제거 -->
               <a class="side-link" href="./report.html#trend">시간대 별 중요정보 탐지 추이</a>
             </div>
 
@@ -96,7 +96,7 @@
 
         <!-- 우측 내용 영역 -->
         <section class="report-content">
-          <!-- 상단 3장 (한 줄, 동일 높이) -->
+          <!-- 상단 2장(1+2칸) -->
           <div class="report-grid report-grid-top">
             <!-- 카드 1: 탐지된 중요정보 비율 -->
             <article class="card report-card">
@@ -111,19 +111,8 @@
               </div>
             </article>
 
-            <!-- 카드 2: 중요정보 탐지 통계 -->
-            <article class="card report-card" id="stats">
-              <header class="card-header">
-                <h3 class="card-title">중요정보 탐지 유형1(LLM)</h3>
-                <span class="card-subtitle">중요정보 탐지 횟수 상위 유형</span>
-              </header>
-              <div class="report-card-body">
-                <canvas id="chart-info-stats" class="report-chart"></canvas>
-              </div>
-            </article>
-
-            <!-- 카드 3: 중요정보 탐지 유형 분류 (도넛) -->
-            <article class="card report-card">
+            <!-- ✅ (기존 카드3) 중요정보 탐지 유형2: 2칸 차지 -->
+            <article class="card report-card" style="grid-column: span 2;">
               <header class="card-header">
                 <h3 class="card-title">중요정보 탐지 유형2(LLM)</h3>
                 <span class="card-subtitle">LABEL 기준 TOP 유형 분포</span>

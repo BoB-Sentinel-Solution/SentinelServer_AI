@@ -15,7 +15,7 @@
         .dashboard-main-grid {
           display: grid;
           grid-template-columns: 1.1fr 1.1fr;
-          /* 1행: 최근 시도 / TODAY 상단, 2행: IP / TODAY 하단, 3행: 유형 비율 / 시간대별 유형 */
+          /* 1행: 최근 시도 / TODAY 상단, 2행: TOP5 / TODAY 하단, 3행: 유형 비율 / 시간대별 유형 */
           grid-template-rows: repeat(3, minmax(260px, auto));
           grid-column-gap: 24px;
           grid-row-gap: 24px;
@@ -158,7 +158,7 @@
     </style>
   </head>
   <body class="sentinel-body">
-    <!-- 상단 네비게이션 바 --> 
+    <!-- 상단 네비게이션 바 -->
     <header class="top-nav">
       <div class="top-nav-left">
         <div class="top-logo">
@@ -215,7 +215,6 @@
           <div class="card-header card-header--today">
             <div>
               <div class="badge">TODAY'S DETECTION</div>
-              <!-- 한글로 통일 당일 탐지 현황,내역 등-->
               <div class="today-metrics">
                 <span><strong id="today-detected">-</strong> 중요정보 탐지</span>
                 <span><strong id="today-blocked">-</strong> 차단</span>
@@ -239,10 +238,10 @@
           </div>
         </div>
 
-        <!-- IP 대역별 탐지 건수 -->
+        <!-- ✅ 탐지 라벨 TOP 5 (전체) -->
         <div class="card card-ip-band">
           <div class="card-header">
-            <h3 class="card-title">전체 IP 대역별 탐지 건수</h3>
+            <h3 class="card-title">전체 중요정보 유형 TOP 5</h3>
           </div>
           <canvas id="chart-ip-band" height="150"></canvas>
         </div>
@@ -251,7 +250,6 @@
         <div class="card card-type-ratio">
           <div class="card-header">
             <h3 class="card-title">탐지된 중요 정보 유형</h3>
-            <!-- 숫자 넣기 -->
           </div>
           <canvas id="chart-type-ratio" height="180"></canvas>
         </div>
@@ -286,9 +284,7 @@
                 <th>Entity</th>
               </tr>
             </thead>
-            <tbody id="log-table-body">
-              <!-- JS에서 채움 -->
-            </tbody>
+            <tbody id="log-table-body"></tbody>
           </table>
         </div>
       </section>

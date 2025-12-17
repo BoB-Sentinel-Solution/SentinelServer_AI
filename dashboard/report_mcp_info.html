@@ -104,9 +104,6 @@
             <article class="card report-card report-card--half">
               <header class="card-header">
                 <h3 class="card-title">MCP가 사용된 앱 서비스 비율</h3>
-                <!-- <span class="card-subtitle">
-                  최근 로그 기준, host / hostname 별 호출 건수
-                </span> -->
               </header>
               <div class="card-body card-body--center">
                 <canvas id="chart-mcp-service-rank" height="220"></canvas>
@@ -120,7 +117,6 @@
             <article class="card report-card report-card--half" id="usage">
               <header class="card-header">
                 <h3 class="card-title">LLM 및 MCP 사용 건수</h3>
-                <!-- <span class="card-subtitle">LLM과 MCP 사용 비중</span> -->
               </header>
               <div class="card-body">
                 <canvas id="chart-mcp-usage-ratio" height="220"></canvas>
@@ -128,23 +124,19 @@
             </article>
           </div>
 
-          <!-- 2행 : MCP 사용량 추이 -->
-          <div class="report-row">
+          <!-- 2행 : MCP 사용량 추이 + 권고 사항(오른쪽으로 이동) -->
+          <div class="report-row report-row--bottom">
             <!-- MCP 사용량 추이 (시간대별) -->
             <article class="card report-card report-card--half">
               <header class="card-header">
                 <h3 class="card-title">MCP 사용량 추이</h3>
-                <!-- <span class="card-subtitle">시간대별 MCP 호출 건수</span> -->
               </header>
               <div class="card-body">
                 <canvas id="chart-mcp-usage-trend" height="230"></canvas>
               </div>
             </article>
-          </div>
 
-          <!-- 3행 : Prediction -->
-          <div class="report-row report-row--bottom">
-            <!-- Prediction 카드 (텍스트) -->
+            <!-- ✅ 권고 사항 카드: 오른쪽 위(빈 칸)로 이동 -->
             <article class="card report-card report-card--half">
               <header class="card-header">
                 <h3 class="card-title">권고 사항</h3>

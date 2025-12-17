@@ -202,19 +202,19 @@
 
       <!-- 가운데 메인 그리드 -->
       <section class="dashboard-main-grid">
-        <!-- 외부 AI 서비스 접근 횟수 (최근 일주일) -->
+        <!-- 외부 AI 서비스 접속 횟수 (최근 일주일) -->
         <div class="card card-recent-attempts">
           <div class="card-header">
-            <h3 class="card-title">외부 AI 서비스 접근 횟수(최근 일주일)</h3>
+            <h3 class="card-title">외부 AI 서비스 접속 횟수(최근 일주일)</h3>
           </div>
           <canvas id="chart-recent-attempts" height="150"></canvas>
         </div>
 
-        <!-- 금일 탐지 현황 : 왼쪽 1,2행과 같은 전체 높이 -->
+        <!-- 오늘의 탐지 : 왼쪽 1,2행과 같은 전체 높이 -->
         <div class="card card-today card-today-detection">
           <div class="card-header card-header--today">
             <div>
-              <div class="badge">금일 탐지 현황</div>
+              <div class="badge">오늘의 탐지</div>
               <div class="today-metrics">
                 <span><strong id="today-detected">-</strong> 중요정보 탐지</span>
                 <span><strong id="today-blocked">-</strong> 차단</span>
@@ -232,62 +232,62 @@
               <canvas id="chart-today-hourly"></canvas>
             </div>
             <div class="card-today-chart">
-              <h4 class="card-subtitle">탐지된 중요 정보 유형</h4>
+              <h4 class="card-subtitle">오늘 탐지된 중요 정보 유형</h4>
               <canvas id="chart-today-type"></canvas>
             </div>
           </div>
         </div>
 
-        <!-- ✅ 탐지 라벨 TOP 5 (전체) -->
+        <!-- ✅ 전체 탐지된 상위 중요정보 유형 (TOP 5) -->
         <div class="card card-ip-band">
           <div class="card-header">
-            <h3 class="card-title">탐지된 상위 중요정보 유형</h3>
+            <h3 class="card-title">전체 탐지된 상위 중요정보 유형</h3>
           </div>
           <canvas id="chart-ip-band" height="150"></canvas>
         </div>
 
-        <!-- 탐지된 중요 정보 유형 -->
+        <!-- 전체 탐지된 중요 정보 유형 -->
         <div class="card card-type-ratio">
           <div class="card-header">
-            <h3 class="card-title">탐지된 중요 정보 유형</h3>
+            <h3 class="card-title">전체 탐지된 중요 정보 유형</h3>
           </div>
           <canvas id="chart-type-ratio" height="180"></canvas>
         </div>
 
-        <!-- 시간대별 탐지된 중요 정보 유형 -->
+        <!-- 전체 시간대별 탐지된 중요 정보 유형 -->
         <div class="card card-hourly-type">
           <div class="card-header">
-            <h3 class="card-title">시간대별 탐지된 중요 정보 유형</h3>
+            <h3 class="card-title">전체 시간대별 탐지된 중요 정보 유형</h3>
           </div>
           <canvas id="chart-hourly-type" height="160"></canvas>
         </div>
       </section>
 
       <!-- 하단 로그 테이블 -->
-<section class="card card-table">
-  <div class="card-header">
-    <h3 class="card-title">실시간 탐지 상위 10건</h3>
-    <span class="card-subtitle">가장 최근에 탐지된 요청 기준</span>
-  </div>
+      <section class="card card-table">
+        <div class="card-header">
+          <h3 class="card-title">전체 실시간 탐지 상위 10건</h3>
+          <span class="card-subtitle">가장 최근에 탐지된 요청 기준</span>
+        </div>
 
-  <div class="table-wrapper">
-    <table class="log-table">
-      <thead>
-        <tr>
-          <th>시간</th>
-          <th>서비스명</th>
-          <th>PC 이름</th>
-          <th>공인 IP</th>
-          <th>사설 IP</th>
-          <th>처리 결과</th>
-          <!-- <th>차단 여부</th> -->
-          <th>탐지 정보 내역</th>
-        </tr>
-      </thead>
-      <tbody id="log-table-body"></tbody>
-    </table>
-  </div>
-</section>
+        <div class="table-wrapper">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>시간</th>
+                <th>서비스명</th>
+                <th>PC 이름</th>
+                <th>공인 IP</th>
+                <th>사설 IP</th>
+                <th>처리 결과</th>
+                <!-- <th>차단 여부</th> -->
+                <th>탐지 정보 내역</th>
+              </tr>
+            </thead>
+            <tbody id="log-table-body"></tbody>
+          </table>
+        </div>
+      </section>
     </main>
 
     <script src="./vendor/chart.umd.min.js"></script>

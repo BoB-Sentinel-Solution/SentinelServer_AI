@@ -186,6 +186,39 @@
           grid-template-columns: repeat(1, minmax(0, 1fr));
         }
       }
+
+      /* ✅ flex 카드가 내용 때문에 가로로 안 밀리게 (핵심) */
+.network-card {
+  min-width: 0; /* flex item shrink 허용 */
+}
+
+/* ✅ 2행 카드 높이 늘어나는 것 방지: 내부 스크롤로 처리 */
+#suspicious-pc-list {
+  max-height: 320px;     /* 필요하면 280~420 조절 */
+  overflow-y: auto;
+  padding-right: 6px;    /* 스크롤바 여백 */
+}
+
+/* 긴 (PUBLIC/PRIVATE/PC) 문자열이 카드 밖으로 튀는 것 방지 */
+#suspicious-pc-list li {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ✅ 테이블도 카드 안에서만 스크롤되게 */
+.network-row .table-wrapper {
+  max-height: 360px;  /* 필요하면 조절 */
+  overflow: auto;     /* x/y 둘 다 스크롤 */
+}
+
+/* (선택) 헤더 고정하면 더 안정적 */
+.network-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f5f7fd;
+  z-index: 1;
+}
+
     </style>
   </head>
 

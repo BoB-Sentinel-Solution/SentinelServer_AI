@@ -3,8 +3,8 @@
 let chartServiceRank = null;
 let chartUsageRatio = null;
 let chartUsageTrend = null;
-let chartIntExt = null;
-let chartServiceUsage = null;
+// let chartIntExt = null;        // ✅ (제거된 카드) 내부/외부 MCP 차트
+// let chartServiceUsage = null;  // ✅ (제거된 카드) MCP 서버별 사용량 차트
 
 // ★ 추가: 라벨 → 한글 매핑 (다른 파일과 동일하게)
 const MCP_LABEL_KR_MAP = {
@@ -96,8 +96,10 @@ async function loadMcpOverview() {
     renderMcpServiceRank(serviceCounts);
     renderUsageRatio(summaryLlm, summaryMcp);
     renderUsageTrend(summaryMcp);
-    renderInternalExternal(mcpLogs);
-    renderServiceUsage(serviceCounts);
+
+    // ✅ 제거된 카드라서 렌더 호출 제거
+    // renderInternalExternal(mcpLogs);
+    // renderServiceUsage(serviceCounts);
 
     // ★ 추가: Prediction 텍스트 갱신
     updatePredictionFromSummary(summaryMcp);
@@ -291,10 +293,10 @@ function renderInternalExternal(mcpLogs) {
     else external += 1;
   });
 
-  if (chartIntExt) {
-    chartIntExt.destroy();
-    chartIntExt = null;
-  }
+  // if (chartIntExt) {
+  //   chartIntExt.destroy();
+  //   chartIntExt = null;
+  // }
 
   if (internal === 0 && external === 0) {
     canvas.style.display = "none";
@@ -306,7 +308,8 @@ function renderInternalExternal(mcpLogs) {
   if (emptyMsg) emptyMsg.style.display = "none";
 
   const ctx = canvas.getContext("2d");
-  chartIntExt = new Chart(ctx, {
+  // chartIntExt = new Chart(ctx, {
+  new Chart(ctx, {
     type: "bar",
     data: {
       labels: ["외부 MCP", "내부 MCP"],
@@ -352,13 +355,14 @@ function renderServiceUsage(serviceCounts) {
   });
   const values = labels.map((k) => serviceCounts[k]);
 
-  if (chartServiceUsage) {
-    chartServiceUsage.destroy();
-    chartServiceUsage = null;
-  }
+  // if (chartServiceUsage) {
+  //   chartServiceUsage.destroy();
+  //   chartServiceUsage = null;
+  // }
 
   const ctx = canvas.getContext("2d");
-  chartServiceUsage = new Chart(ctx, {
+  // chartServiceUsage = new Chart(ctx, {
+  new Chart(ctx, {
     type: "bar",
     data: {
       labels,

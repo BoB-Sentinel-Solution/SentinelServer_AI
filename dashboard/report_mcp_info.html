@@ -48,53 +48,53 @@
       </section>
 
       <!-- 메인 2컬럼 레이아웃 (좌: 사이드바 / 우: 콘텐츠) -->
-<section class="report-main">
-  <!-- 좌측 사이드 메뉴 -->
-  <aside class="report-sidebar">
-    <div class="report-sidebar-inner">
-      <!-- OVERALL (현재 페이지) -->
-      <div class="side-group">
-        <div class="side-group-title">| OVERALL</div>
-        <a class="side-link side-link--active" href="./report_mcp_info.html">
-          MCP 서버 사용 순위
-        </a>
-        <a class="side-link" href="./report_mcp_info.html">
-          MCP 사용량
-        </a>
-      </div>
+      <section class="report-main">
+        <!-- 좌측 사이드 메뉴 -->
+        <aside class="report-sidebar">
+          <div class="report-sidebar-inner">
+            <!-- OVERALL (현재 페이지) -->
+            <div class="side-group">
+              <div class="side-group-title">| OVERALL</div>
+              <a class="side-link side-link--active" href="./report_mcp_info.html">
+                MCP 서버 사용 순위
+              </a>
+              <a class="side-link" href="./report_mcp_info.html">
+                MCP 사용량
+              </a>
+            </div>
 
-      <!-- INFORMATION BASED -->
-      <div class="side-group">
-        <div class="side-group-title">| INFORMATION BASED</div>
-        <a class="side-link" href="./report_mcp_information.html">
-          중요정보 탐지
-        </a>
-        <a class="side-link" href="./report_mcp_information.html">
-          서비스별 중요 정보 탐지
-        </a>
-        <a class="side-link" href="./report_mcp_information.html">
-          MCP 사용량 추이
-        </a>
-      </div>
+            <!-- INFORMATION BASED -->
+            <div class="side-group">
+              <div class="side-group-title">| INFORMATION BASED</div>
+              <a class="side-link" href="./report_mcp_information.html">
+                중요정보 탐지
+              </a>
+              <a class="side-link" href="./report_mcp_information.html">
+                서비스별 중요 정보 탐지
+              </a>
+              <a class="side-link" href="./report_mcp_information.html">
+                MCP 사용량 추이
+              </a>
+            </div>
 
-      <!-- CONFIG -->
-      <div class="side-group">
-        <div class="side-group-title">| CONFIG</div>
-        <a class="side-link" href="./report_mcp_config.html">
-          활성화된 MCP 개수
-        </a>
-        <a class="side-link" href="./report_mcp_config.html">
-          활성화된 MCP마다의 타임 분포
-        </a>
-        <a class="side-link" href="./report_mcp_config.html">
-          시간대별 업데이트된 MCP 목록
-        </a>
-        <a class="side-link" href="./report_mcp_config.html">
-          호스트별 활성 MCP 개수 순위
-        </a>
-      </div>
-    </div>
-  </aside>
+            <!-- CONFIG -->
+            <div class="side-group">
+              <div class="side-group-title">| CONFIG</div>
+              <a class="side-link" href="./report_mcp_config.html">
+                활성화된 MCP 개수
+              </a>
+              <a class="side-link" href="./report_mcp_config.html">
+                활성화된 MCP마다의 타임 분포
+              </a>
+              <a class="side-link" href="./report_mcp_config.html">
+                시간대별 업데이트된 MCP 목록
+              </a>
+              <a class="side-link" href="./report_mcp_config.html">
+                호스트별 활성 MCP 개수 순위
+              </a>
+            </div>
+          </div>
+        </aside>
 
         <!-- 메인 카드 영역 -->
         <section class="report-content">
@@ -128,7 +128,7 @@
             </article>
           </div>
 
-          <!-- 2행 : MCP 사용량 추이 + 외부/내부 MCP 비중 -->
+          <!-- 2행 : MCP 사용량 추이 -->
           <div class="report-row">
             <!-- MCP 사용량 추이 (시간대별) -->
             <article class="card report-card report-card--half">
@@ -140,39 +140,10 @@
                 <canvas id="chart-mcp-usage-trend" height="230"></canvas>
               </div>
             </article>
-
-            <!-- 외부 MCP와 내부 MCP 비중 -->
-            <article class="card report-card report-card--half">
-              <header class="card-header">
-                <h3 class="card-title">외부 MCP와 내부 MCP 건수</h3>
-                <!-- <span class="card-subtitle">
-                  MCP 로그의 Public IP 기준 (사설 대역 = 내부)
-                </span> -->
-              </header>
-              <div class="card-body card-body--center">
-                <canvas id="chart-mcp-int-ext" height="230"></canvas>
-                <p class="card-note" id="mcp-int-ext-empty" style="display:none;">
-                  IP 정보가 있는 MCP 로그가 없습니다.
-                </p>
-              </div>
-            </article>
           </div>
 
-          <!-- 3행 : MCP 서버별 사용량 + Prediction -->
+          <!-- 3행 : Prediction -->
           <div class="report-row report-row--bottom">
-            <!-- MCP 서버별 사용량 (bar) -->
-            <article class="card report-card report-card--half">
-              <header class="card-header">
-                <h3 class="card-title">MCP 서버별 사용량 추이</h3>
-                <!-- <span class="card-subtitle">
-                  최근 MCP 로그 기준, 서비스(host) 별 호출 건수
-                </span> -->
-              </header>
-              <div class="card-body">
-                <canvas id="chart-mcp-service-usage" height="220"></canvas>
-              </div>
-            </article>
-
             <!-- Prediction 카드 (텍스트) -->
             <article class="card report-card report-card--half">
               <header class="card-header">
@@ -180,7 +151,7 @@
               </header>
               <div class="card-body prediction-body">
                 <p>
-                  최근 MCP 서비스에서 
+                  최근 MCP 서비스에서
                   <strong id="mcp-pred-main-labels">중요정보</strong>가 반복적으로 탐지되고 있습니다.
                 </p>
                 <p>

@@ -196,26 +196,31 @@ function getRiskLevelInfo(score) {
   let label = "정상";
   let desc = "평소 수준의 사용 패턴. 별도 조치 필요 없음.";
   let badgeClass = "score-level-badge--blue";
+  let valueClass = "score-hero-value--blue"; // ✅ (추가) 숫자 색상 클래스
 
   if (score >= 85) {
     label = "위험";
     desc = "계정 잠금, 규칙 강화 등 강한 보안 조치 검토 필요.";
     badgeClass = "score-level-badge--red";
+    valueClass = "score-hero-value--red";
   } else if (score >= 70) {
     label = "경계";
     desc = "특정부서/계정 집중 점검 및 로그 상세 분석 필요.";
     badgeClass = "score-level-badge--orange";
+    valueClass = "score-hero-value--orange";
   } else if (score >= 50) {
     label = "주의";
     desc = "중요정보 사용량 증가. 가이드/공지 재배포 고려.";
     badgeClass = "score-level-badge--yellow";
+    valueClass = "score-hero-value--yellow";
   } else if (score >= 30) {
     label = "관심";
     desc = "일시적인 증가. 특정 사용자/호스트 모니터링 권장.";
     badgeClass = "score-level-badge--green";
+    valueClass = "score-hero-value--green";
   }
 
-  return { label, desc, badgeClass };
+  return { label, desc, badgeClass, valueClass };
 }
 
 // Score₁, Score₂, 최종 Risk Score 계산
@@ -368,13 +373,26 @@ function renderTodayRisk(stats) {
   if (part2El) part2El.textContent = String(score2);
   if (finalEl) finalEl.textContent = String(finalScore);
 
-  const { label, desc, badgeClass } = getRiskLevelInfo(finalScore);
+  const { label, desc, badgeClass, valueClass } = getRiskLevelInfo(finalScore);
 
   if (badgeEl) {
     // 기존 클래스 제거 후 새 등급 클래스 추가
     badgeEl.className = "score-level-badge " + badgeClass;
     badgeEl.textContent = label;
   }
+
+  // ✅ (추가) 위험지수 숫자도 등급에 따라 색상 클래스 적용
+  if (valueEl) {
+    valueEl.classList.remove(
+      "score-hero-value--blue",
+      "score-hero-value--green",
+      "score-hero-value--yellow",
+      "score-hero-value--orange",
+      "score-hero-value--red"
+    );
+    valueEl.classList.add(valueClass);
+  }
+
   if (levelTextEl) {
     levelTextEl.textContent = `현재 등급: ${label}`;
   }

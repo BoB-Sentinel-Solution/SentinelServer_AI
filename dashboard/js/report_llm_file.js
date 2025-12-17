@@ -3,8 +3,8 @@
 let fileExtDonutChart = null;
 let fileExtStackChart = null;
 
-// ✅ 추가: 파일 페이지에서 숨길 확장자(형식)
-const HIDE_FILE_FORMATS = new Set(["TEXT"]);
+// ✅ 숨길 파일 형식 (원하면 TXT도 추가 가능)
+const HIDE_FILE_FORMATS = new Set(["TEXT", "UNKNOWN"]);
 
 document.addEventListener("DOMContentLoaded", () => {
   initTopBarClock();
@@ -43,7 +43,6 @@ function hookRefreshButton() {
  */
 async function loadFileBasedReport() {
   try {
-    // api.js에 정의된 fetchLlmFileSummary() 사용
     const summary = await fetchLlmFileSummary();
     console.log("[report_llm_file] summary:", summary);
 
@@ -54,7 +53,8 @@ async function loadFileBasedReport() {
     console.error("파일 기반 리포트 로딩 실패:", err);
     const errBox = document.getElementById("file-error-box");
     if (errBox) {
-      errBox.textContent = "파일 리포트 데이터를 불러오는 중 오류가 발생했습니다.";
+      errBox.textContent =
+        "파일 리포트 데이터를 불러오는 중 오류가 발생했습니다.";
       errBox.style.display = "block";
     }
   }
@@ -66,24 +66,20 @@ function renderFileDonut(donut) {
   const emptyMsg = document.getElementById("file-donut-empty");
   if (!canvas) return;
 
-  // 이전 차트 제거
   if (fileExtDonutChart) {
     fileExtDonutChart.destroy();
     fileExtDonutChart = null;
   }
 
-  const rawLabels = donut?.labels || [];
+  // ✅ TEXT/UNKNOWN 제거
+  const rawLabels = (donut?.labels || []).map((x) => String(x).toUpperCase());
   const rawValues = donut?.data || [];
 
-  // ✅ TEXT 제거 (labels/values 인덱스 유지하면서 같이 필터)
-  const pairs = rawLabels.map((lab, i) => ({
-    label: String(lab).toUpperCase(),
-    value: Number(rawValues[i]) || 0,
-  }));
-  const filtered = pairs.filter((p) => !HIDE_FILE_FORMATS.has(p.label));
+  const pairs = rawLabels.map((lab, i) => [lab, Number(rawValues[i] || 0)]);
+  const filtered = pairs.filter(([lab, val]) => val > 0 && !HIDE_FILE_FORMATS.has(lab));
 
-  const labels = filtered.map((p) => p.label);
-  const values = filtered.map((p) => p.value);
+  const labels = filtered.map(([lab]) => lab);
+  const values = filtered.map(([, val]) => val);
 
   if (!labels.length || !values.length) {
     canvas.style.display = "none";
@@ -101,21 +97,13 @@ function renderFileDonut(donut) {
     type: "doughnut",
     data: {
       labels,
-      datasets: [
-        {
-          label: "탐지 건수",
-          data: values,
-          borderWidth: 1,
-        },
-      ],
+      datasets: [{ label: "탐지 건수", data: values, borderWidth: 1 }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: {
-          position: "right",
-        },
+        legend: { position: "right" },
         tooltip: {
           callbacks: {
             label: function (ctx) {
@@ -138,34 +126,24 @@ function renderFileStack(stacked) {
   const emptyMsg = document.getElementById("file-stack-empty");
   if (!canvas) return;
 
-  // 이전 차트 제거
   if (fileExtStackChart) {
     fileExtStackChart.destroy();
     fileExtStackChart = null;
   }
 
-  const formatsRaw = stacked?.formats || [];
+  let formats = (stacked?.formats || []).map((f) => String(f).toUpperCase());
   const entityLabels = stacked?.labels || [];
-  const matrixRaw = stacked?.matrix || [];
+  let matrix = stacked?.matrix || [];
 
-  if (!formatsRaw.length || !entityLabels.length || !matrixRaw.length) {
-    canvas.style.display = "none";
-    if (emptyMsg) emptyMsg.style.display = "block";
-    return;
-  }
-
-  // ✅ TEXT format 제거 (formats + matrix row 같이 제거)
-  const kept = [];
-  formatsRaw.forEach((f, idx) => {
-    const fmt = String(f).toUpperCase();
-    if (HIDE_FILE_FORMATS.has(fmt)) return;
-    kept.push({ fmt, row: matrixRaw[idx] || [] });
+  // ✅ TEXT/UNKNOWN 포맷 행 제거
+  const keepIdx = [];
+  formats.forEach((fmt, i) => {
+    if (!HIDE_FILE_FORMATS.has(fmt)) keepIdx.push(i);
   });
+  formats = keepIdx.map((i) => formats[i]);
+  matrix = keepIdx.map((i) => matrix[i]);
 
-  const formats = kept.map((k) => k.fmt);
-  const matrix = kept.map((k) => k.row);
-
-  if (!formats.length) {
+  if (!formats.length || !entityLabels.length || !matrix.length) {
     canvas.style.display = "none";
     if (emptyMsg) emptyMsg.style.display = "block";
     return;
@@ -174,42 +152,26 @@ function renderFileStack(stacked) {
   canvas.style.display = "block";
   if (emptyMsg) emptyMsg.style.display = "none";
 
-  // datasets: 각 엔티티 라벨별로 한 줄
-  const datasets = entityLabels.map((lab, labIdx) => {
-    return {
-      label: lab,
-      data: formats.map((_, fmtIdx) => matrix[fmtIdx]?.[labIdx] || 0),
-      stack: "file-labels",
-    };
-  });
+  const datasets = entityLabels.map((lab, labIdx) => ({
+    label: lab,
+    data: formats.map((_, fmtIdx) => matrix[fmtIdx]?.[labIdx] || 0),
+    stack: "file-labels",
+  }));
 
   const ctx = canvas.getContext("2d");
   fileExtStackChart = new Chart(ctx, {
     type: "bar",
-    data: {
-      labels: formats,
-      datasets,
-    },
+    data: { labels: formats, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      indexAxis: "y", // 가로 막대
+      indexAxis: "y",
       scales: {
-        x: {
-          stacked: true,
-          title: {
-            display: true,
-            text: "탐지 건수",
-          },
-        },
-        y: {
-          stacked: true,
-        },
+        x: { stacked: true, title: { display: true, text: "탐지 건수" } },
+        y: { stacked: true },
       },
       plugins: {
-        legend: {
-          position: "bottom",
-        },
+        legend: { position: "bottom" },
         tooltip: {
           callbacks: {
             label: function (ctx) {
@@ -232,19 +194,21 @@ function renderFileTable(recent) {
 
   tbody.innerHTML = "";
 
-  // ✅ TEXT row 제거
-  const rows = (Array.isArray(recent) ? recent : []).filter((row) => {
-    const ext = String(row?.file_ext || "").toUpperCase();
+  const rows = Array.isArray(recent) ? recent : [];
+
+  // ✅ TEXT/UNKNOWN 행 제거
+  const filteredRows = rows.filter((row) => {
+    const ext = String(row.file_ext || "").toUpperCase();
     return !HIDE_FILE_FORMATS.has(ext);
   });
 
-  if (!rows.length) {
+  if (!filteredRows.length) {
     if (emptyMsg) emptyMsg.style.display = "block";
     return;
   }
   if (emptyMsg) emptyMsg.style.display = "none";
 
-  rows.forEach((row) => {
+  filteredRows.forEach((row) => {
     const tr = document.createElement("tr");
 
     const time = formatTime(row.time || row.created_at);
@@ -267,7 +231,6 @@ function renderFileTable(recent) {
     tr.appendChild(td(sensitive, "center"));
     tr.appendChild(td(fileBlocked, "center"));
 
-    // Download 컬럼 (추후 구현용 더미 버튼)
     const tdDownload = document.createElement("td");
     tdDownload.className = "text-center";
     const btn = document.createElement("button");
@@ -293,7 +256,6 @@ function td(text, align) {
 function formatTime(iso) {
   if (!iso) return "";
   try {
-    // "2025-11-14T09:30:12.345678" -> "2025-11-14 09:30:12"
     return iso.replace("T", " ").slice(0, 19);
   } catch {
     return iso;

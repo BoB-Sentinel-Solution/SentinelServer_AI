@@ -10,7 +10,7 @@ from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import cast, Text, func  # JSON 검색 + interface 필터용
+from sqlalchemy import cast, Text, func, or_  # JSON 검색 + interface 필터용
 
 from db import SessionLocal, Base, engine
 from models import LogRecord, McpConfigEntry
@@ -586,6 +586,7 @@ def list_logs(
     page_size: int = 20,
     q: str | None = None,
     category: str | None = None,
+    sensitive_only: bool = False,   # ✅ 추가
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
@@ -634,6 +635,24 @@ def list_logs(
                 | (LogRecord.public_ip.ilike(like))
                 | (LogRecord.private_ip.ilike(like))
             )
+
+    # ✅ 민감 로그만 보기 (has_sensitive=true OR attachment.file_change=true)
+    if sensitive_only:
+        att_text = cast(LogRecord.attachment, Text)
+
+        # 최소 수정 버전: attachment JSON을 문자열로 보고 file_change:true 패턴을 포함하면 매칭
+        file_change_true = or_(
+            att_text.ilike('%"file_change"%true%'),
+            att_text.ilike('%"file_change"%True%'),
+            att_text.ilike('%"file_change"%1%'),
+        )
+
+        query = query.filter(
+            or_(
+                LogRecord.has_sensitive.is_(True),
+                file_change_true,
+            )
+        )
 
     query = query.order_by(LogRecord.created_at.desc())
 

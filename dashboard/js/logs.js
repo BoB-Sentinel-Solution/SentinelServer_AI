@@ -108,18 +108,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("page_size", String(pageSize));
+    params.set("sensitive_only", "true"); // ✅ 최소 수정: 민감 로그만 조회
     if (currentQuery) params.set("q", currentQuery);
     if (currentCategory) params.set("category", currentCategory);
 
     const res = await window.SentinelApi.get(`/logs?${params.toString()}`);
 
-    // 백엔드에서 아래 형태로 응답한다고 가정:
-    // {
-    //   "items": [...],
-    //   "total": 123,
-    //   "page": 1,
-    //   "page_size": 20
-    // }
     const items = res.items || [];
     const total = res.total ?? items.length;
     const pageSizeResp = res.page_size || pageSize;
@@ -138,7 +132,6 @@ document.addEventListener("DOMContentLoaded", () => {
     setUpdatedNow();
   }
 
-  // 검색 버튼 / Enter
   function applySearch() {
     currentQuery = (searchInput.value || "").trim();
     currentCategory = categorySelect.value || "";
@@ -149,7 +142,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // CSV 내보내기 (선택된 행만)
   function exportSelectedToCsv() {
     const checks = Array.from(
       document.querySelectorAll(".logs-row-check")
@@ -161,7 +153,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const rows = [];
-    // 헤더
     rows.push([
       "Prompt",
       "Time",
@@ -180,12 +171,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const tr = chk.closest("tr");
       if (!tr) return;
       const tds = tr.querySelectorAll("td");
-      // 0: checkbox, 1~11: 데이터
       const cols = Array.from(tds)
         .slice(1)
-        .map((td) =>
-          `"${(td.textContent || "").replace(/"/g, '""').trim()}"`
-        );
+        .map((td) => `"${(td.textContent || "").replace(/"/g, '""').trim()}"`);
       rows.push(cols);
     });
 
@@ -202,7 +190,6 @@ document.addEventListener("DOMContentLoaded", () => {
     URL.revokeObjectURL(url);
   }
 
-  // 이벤트 바인딩
   if (btnRefreshTop) {
     btnRefreshTop.addEventListener("click", () => {
       fetchLogs(currentPage).catch((err) => {
@@ -223,9 +210,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (searchInput) {
     searchInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        applySearch();
-      }
+      if (e.key === "Enter") applySearch();
     });
   }
 
@@ -264,12 +249,10 @@ document.addEventListener("DOMContentLoaded", () => {
     btnExportCsv.addEventListener("click", exportSelectedToCsv);
   }
 
-  // 초기 로드
   fetchLogs(currentPage).catch((err) => {
     console.error(err);
     alert("로그를 불러오는 중 오류가 발생했습니다.");
   });
 
-  // 상단 시간 표시 주기적 업데이트
   setInterval(setUpdatedNow, 1000);
 });

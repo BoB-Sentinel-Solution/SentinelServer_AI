@@ -467,7 +467,7 @@
           <header class="card-header">
             <h3 class="card-title">탐지 건수 TOP 5</h3>
             <span class="card-subtitle">
-              PC Name + Host 기준 중요정보 탐지 건수 상위 5개
+              분석할 PC를 선택한 뒤, "분석하기" 버튼을 눌러 중요정보 유출 원인을 확인하세요.
             </span>
           </header>
           <div class="card-body">
@@ -519,7 +519,7 @@
       >
         <article class="card reason-card--full">
           <header class="card-header">
-            <h3 class="card-title">프롬프트 위험 분석 결과</h3>
+            <h3 class="card-title">프롬프트 입력 내용 위험 분석 결과</h3>
             <span class="card-subtitle">
               선택된 PC 기준 중요정보 탐지 로그에 대한 AI 분석 요약
             </span>
@@ -626,7 +626,7 @@
 
             <!-- 프롬프트 위험 분석 캐러셀 -->
             <div class="carousel-wrapper">
-              <div class="carousel-header">프롬프트 위험 분석 결과</div>
+              <div class="carousel-header">잠재적 고위험 예측 결과</div>
               <div class="carousel-inner">
                 <div
                   id="reason-carousel-prev"
@@ -699,15 +699,15 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Time</th>
-                    <th>Host</th>
-                    <th>PC Name</th>
-                    <th>Public IP</th>
-                    <th>Private IP</th>
-                    <th>Action</th>
-                    <th>Risk Category</th>
-                    <th>Intent</th>
-                    <th>Reason</th>
+                    <th>시간</th>
+                    <th>서비스</th>
+                    <th>PC 이름</th>
+                    <th>공인 IP</th>
+                    <th>사설 IP</th>
+                    <th>처리 결과</th>
+                    <th>위험 분류</th>
+                    <th>의도</th>
+                    <th>판단 근거</th>
                   </tr>
                 </thead>
                 <tbody id="reason-log-tbody">

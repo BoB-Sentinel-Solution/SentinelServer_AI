@@ -3,6 +3,9 @@
 let fileExtDonutChart = null;
 let fileExtStackChart = null;
 
+// ✅ 추가: 파일 페이지에서 숨길 확장자(형식)
+const HIDE_FILE_FORMATS = new Set(["TEXT"]);
+
 document.addEventListener("DOMContentLoaded", () => {
   initTopBarClock();
   hookRefreshButton();
@@ -69,8 +72,18 @@ function renderFileDonut(donut) {
     fileExtDonutChart = null;
   }
 
-  const labels = (donut?.labels || []).map((x) => String(x).toUpperCase());
-  const values = donut?.data || [];
+  const rawLabels = donut?.labels || [];
+  const rawValues = donut?.data || [];
+
+  // ✅ TEXT 제거 (labels/values 인덱스 유지하면서 같이 필터)
+  const pairs = rawLabels.map((lab, i) => ({
+    label: String(lab).toUpperCase(),
+    value: Number(rawValues[i]) || 0,
+  }));
+  const filtered = pairs.filter((p) => !HIDE_FILE_FORMATS.has(p.label));
+
+  const labels = filtered.map((p) => p.label);
+  const values = filtered.map((p) => p.value);
 
   if (!labels.length || !values.length) {
     canvas.style.display = "none";
@@ -131,11 +144,28 @@ function renderFileStack(stacked) {
     fileExtStackChart = null;
   }
 
-  const formats = stacked?.formats || [];
+  const formatsRaw = stacked?.formats || [];
   const entityLabels = stacked?.labels || [];
-  const matrix = stacked?.matrix || [];
+  const matrixRaw = stacked?.matrix || [];
 
-  if (!formats.length || !entityLabels.length || !matrix.length) {
+  if (!formatsRaw.length || !entityLabels.length || !matrixRaw.length) {
+    canvas.style.display = "none";
+    if (emptyMsg) emptyMsg.style.display = "block";
+    return;
+  }
+
+  // ✅ TEXT format 제거 (formats + matrix row 같이 제거)
+  const kept = [];
+  formatsRaw.forEach((f, idx) => {
+    const fmt = String(f).toUpperCase();
+    if (HIDE_FILE_FORMATS.has(fmt)) return;
+    kept.push({ fmt, row: matrixRaw[idx] || [] });
+  });
+
+  const formats = kept.map((k) => k.fmt);
+  const matrix = kept.map((k) => k.row);
+
+  if (!formats.length) {
     canvas.style.display = "none";
     if (emptyMsg) emptyMsg.style.display = "block";
     return;
@@ -157,7 +187,7 @@ function renderFileStack(stacked) {
   fileExtStackChart = new Chart(ctx, {
     type: "bar",
     data: {
-      labels: formats.map((f) => String(f).toUpperCase()),
+      labels: formats,
       datasets,
     },
     options: {
@@ -202,7 +232,11 @@ function renderFileTable(recent) {
 
   tbody.innerHTML = "";
 
-  const rows = Array.isArray(recent) ? recent : [];
+  // ✅ TEXT row 제거
+  const rows = (Array.isArray(recent) ? recent : []).filter((row) => {
+    const ext = String(row?.file_ext || "").toUpperCase();
+    return !HIDE_FILE_FORMATS.has(ext);
+  });
 
   if (!rows.length) {
     if (emptyMsg) emptyMsg.style.display = "block";

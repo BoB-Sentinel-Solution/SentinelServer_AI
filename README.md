@@ -6,7 +6,7 @@ Sentinel Solution의 **서버 레포지토리**입니다.
 
 ---
 
-## What’s in this repo
+## Repository Overview
 
 - **FastAPI 기반 서버 애플리케이션**
 - **Dashboard(Web UI)** 정적 리소스 제공
@@ -64,7 +64,7 @@ bash setup/scripts/deploy.sh
 서비스 실행 유저입니다.  
 systemd 서비스가 해당 계정 권한으로 실행됩니다.
 
-> 전체 키 목록 및 상세 의미는 **`setup/.env`**를 기준으로 확인하세요.
+> 전체 키 목록 및 상세 의미는 `setup/.env`를 기준으로 확인하세요.
 
 
 ---
@@ -81,7 +81,7 @@ sudo bash uninstall.sh
 # 2) 무확인 전체 제거(서비스/코드/venv/DB/인증서)
 sudo bash uninstall.sh --force
 
-# 4=3) 서비스만 제거(코드/DB/파일은 유지)
+# 3) 서비스만 제거(코드/DB/파일은 유지)
 sudo bash uninstall.sh --only-service
 ```
 
@@ -92,7 +92,7 @@ sudo bash uninstall.sh --only-service
 - API 라우팅은 `routers/` 디렉터리에서 관리합니다.
 - 대시보드는 `dashboard/` 정적 리소스 기반으로 제공됩니다.
 
-실제 엔드포인트 목록 및 요청/응답 스키마는 `routers/`, **`schemas.py`**를 기준으로 문서화하는 것을 권장합니다.
+실제 엔드포인트 목록 및 요청/응답 스키마는 `routers/`, `schemas.py`를 기준으로 문서화하는 것을 권장합니다.
 
 
 ---
@@ -100,7 +100,7 @@ sudo bash uninstall.sh --only-service
 ## Operational Notes
 
 - 운영 환경에서는 `setup/scripts/deploy.sh` 기반 배포를 권장합니다.
-- 본 레포는 인증서/서비스/DB를 포함한 '원클릭 배포'를 전제로 구성되어 있습니다.
+- 본 레포는 인증서/서비스/DB를 포함한 **원클릭 배포**를 전제로 구성되어 있습니다.
 - 내부망/외부망 환경을 분리 운영하는 경우, 환경별로 `setup/.env` 값을 분리(예: 내부용/외부용)하여 관리하는 것을 추천합니다.
 
 ---

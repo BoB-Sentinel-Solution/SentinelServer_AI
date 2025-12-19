@@ -18,6 +18,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const btnExportCsv = document.getElementById("logs-export-csv");
 
+  // ✅ (추가) 전체 로그 보기 토글
+  const sensitiveOnlyEl = document.getElementById("logs-sensitive-only");
+
   let currentPage = 1;
   const pageSize = 20;
   let totalPages = 1;
@@ -108,7 +111,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("page_size", String(pageSize));
-    params.set("sensitive_only", "true"); // ✅ 최소 수정: 민감 로그만 조회
+
+    // ✅ 최소 수정:
+    // - 기본(체크 해제): 민감 로그만(sensitive_only=true) = 기존 동작 유지
+    // - 체크(전체 로그 보기): 전체 로그(sensitive_only=false)
+    params.set("sensitive_only", sensitiveOnlyEl?.checked ? "false" : "true");
+
     if (currentQuery) params.set("q", currentQuery);
     if (currentCategory) params.set("category", currentCategory);
 
@@ -211,6 +219,17 @@ document.addEventListener("DOMContentLoaded", () => {
   if (searchInput) {
     searchInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") applySearch();
+    });
+  }
+
+  // ✅ (추가) 전체 로그 보기 토글 변경 시 재조회
+  if (sensitiveOnlyEl) {
+    sensitiveOnlyEl.addEventListener("change", () => {
+      currentPage = 1;
+      fetchLogs(currentPage).catch((err) => {
+        console.error(err);
+        alert("로그를 불러오는 중 오류가 발생했습니다.");
+      });
     });
   }
 

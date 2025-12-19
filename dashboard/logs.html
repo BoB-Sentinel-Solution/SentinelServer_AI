@@ -56,6 +56,7 @@
                 placeholder="Search for prompt, host, IP..."
               />
             </div>
+
             <div class="logs-category">
               <select id="logs-category-select" class="logs-category-select">
                 <option value="">All Categories</option>
@@ -67,6 +68,13 @@
                 <option value="entity">Entity</option>
               </select>
             </div>
+
+            <!-- ✅ 추가: 민감 로그만 보기 토글 (기본 ON = 기존 동작 유지) -->
+            <label class="logs-toggle" style="display:flex; align-items:center; gap:8px; margin-right:8px; user-select:none;">
+              <input type="checkbox" id="logs-sensitive-only" />
+              전체 로그 보기
+            </label>
+
             <button id="logs-search-btn" class="btn btn-small">Search</button>
           </div>
         </div>

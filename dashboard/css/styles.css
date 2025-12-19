@@ -992,3 +992,34 @@
     font-size: 22px;
   }
 }
+
+/* logs.html - "선택 항목 CSV 내보내기" 가시성 개선 */
+#logs-export-csv {
+  background: #ffffff;
+  color: #111827;                 /* 글자 진하게 */
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+#logs-export-csv:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+#logs-export-csv:active {
+  transform: translateY(1px);
+}
+
+#logs-export-csv:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.35);
+  outline-offset: 2px;
+}
+
+/* footer 정렬도 살짝 안정화(선택) */
+.logs-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

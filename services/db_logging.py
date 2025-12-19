@@ -82,8 +82,8 @@ def _is_monitored_by_settings(cfg: Dict[str, Any], interface: str, host: str) ->
 
     enabled = sf.get(itf)
     if not isinstance(enabled, dict):
-        # service_filters는 있는데 이 interface 설정이 없으면 "선택 안 함"으로 간주 → OFF 권장
-        return False
+        # ✅ interface 설정이 없으면 기본 ON (denylist 정책)
+        return True
 
     # ✅ 전부 체크 해제면 “전부 모니터링 OFF”
     if not any(bool(v) for v in enabled.values()):
@@ -93,12 +93,13 @@ def _is_monitored_by_settings(cfg: Dict[str, Any], interface: str, host: str) ->
     if mapping is None:
         return True  # 모르는 interface는 기존처럼 ON (원하면 False로 바꿔도 됨)
 
+    # ✅ host가 매핑되면: 체크 상태 그대로 반영(체크 해제 시 OFF)
     for key, substr in mapping.items():
-        if enabled.get(key) and substr in h:
-            return True
+        if substr in h:
+            return bool(enabled.get(key, True))
 
-    return False
-
+    # ✅ 매핑에 없는 host는 기본 ON
+    return True
 
 # =========================
 # 기존 유틸

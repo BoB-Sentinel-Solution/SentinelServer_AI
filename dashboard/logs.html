@@ -7,7 +7,38 @@
 
     <link rel="stylesheet" href="./vendor/reset.min.css" />
     <link rel="stylesheet" href="./css/styles.css" />
+
+    <!-- ✅ logs 페이지에서만: 토글 가시성/정렬 개선 (간단) -->
+    <style>
+      .logs-header-right{
+        display:flex;
+        align-items:center;
+        gap:10px;
+        flex-wrap:wrap;
+      }
+      .logs-toggle{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        padding:6px 10px;
+        border:1px solid rgba(15,23,42,.12);
+        border-radius:10px;
+        background:#f8fafc;
+        user-select:none;
+        white-space:nowrap;
+      }
+      .logs-toggle input{
+        width:16px;
+        height:16px;
+        accent-color:#2563eb;
+      }
+      .logs-toggle:hover{
+        background:#eef2ff;
+        border-color:rgba(37,99,235,.35);
+      }
+    </style>
   </head>
+
   <body class="sentinel-body">
     <!-- 상단 네비게이션 바 -->
     <header class="top-nav">
@@ -69,13 +100,14 @@
               </select>
             </div>
 
-            <!-- ✅ 추가: 민감 로그만 보기 토글 (기본 ON = 기존 동작 유지) -->
-            <label class="logs-toggle" style="display:flex; align-items:center; gap:8px; margin-right:8px; user-select:none;">
-              <input type="checkbox" id="logs-sensitive-only" />
-              전체 로그 보기
-            </label>
-
+            <!-- ✅ Search 오른쪽에 배치 -->
             <button id="logs-search-btn" class="btn btn-small">Search</button>
+
+            <!-- ✅ 전체 로그 보기 토글 (기본 OFF: 현재 코드에서 sensitive_only=true 유지라면 JS에서 checked 기준으로 처리) -->
+            <label class="logs-toggle" title="체크하면 전체 로그를 조회합니다. (해제 시 탐지 로그만 조회)">
+              <input type="checkbox" id="logs-sensitive-only" />
+              <span>전체 로그 보기</span>
+            </label>
           </div>
         </div>
 

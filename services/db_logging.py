@@ -127,6 +127,38 @@ def _rebase_ai_entities_on_original(original: str, ai_ents: List[Dict[str, Any]]
         out.append({"label": label, "value": value, "begin": b, "end": en})
     return out
 
+def _merge_raw_and_norm_drop_overlap(
+    raw: List[Dict[str, Any]],
+    norm: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    raw 우선 병합.
+    norm 엔티티는 raw의 어떤 엔티티와도 스팬이 '조금이라도' 겹치면 버린다(라벨 무관).
+    겹치지 않는 norm만 raw 뒤에 붙인다.
+    """
+    out = list(raw)
+
+    for e in norm:
+        eb, ee = int(e.get("begin", -1)), int(e.get("end", -1))
+        if eb < 0 or ee < 0 or ee <= eb:
+            continue
+
+        overlapped = False
+        for x in raw:
+            xb, xe = int(x.get("begin", -1)), int(x.get("end", -1))
+            if xb < 0 or xe < 0 or xe <= xb:
+                continue
+            # ✅ 조금이라도 겹치면 overlap
+            if not (ee <= xb or xe <= eb):
+                overlapped = True
+                break
+
+        if overlapped:
+            continue
+
+        out.append(e)
+
+    return out
 
 def _dedup_spans(base: List[Dict[str, Any]], extra: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -354,7 +386,11 @@ class DbLoggingService:
                 if 0 <= b < en <= len(ocr_text):
                     e["value"] = ocr_text[b:en]
 
-            regex_ents_ocr = _dedup_spans(regex_ents_ocr_raw, regex_ents_ocr_norm)
+            regex_ents_ocr = _merge_raw_and_norm_drop_overlap(
+                regex_ents_ocr_raw,
+                regex_ents_ocr_norm,
+            )
+
         else:
             regex_ents_ocr = []
 
@@ -402,7 +438,10 @@ class DbLoggingService:
                     e["value"] = prompt_text[b:en]
 
             # 3-4) 병합
-            regex_ents_prompt = _dedup_spans(regex_ents_prompt_raw, regex_ents_prompt_norm)
+            regex_ents_prompt = _merge_raw_and_norm_drop_overlap(
+                regex_ents_prompt_raw,
+                regex_ents_prompt_norm,
+            )
 
             # 4) AI 입력용 마스킹(정규식 결과만, 괄호 포함)
             masked_for_ai = mask_with_parens_by_entities(

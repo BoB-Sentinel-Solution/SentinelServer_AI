@@ -59,6 +59,16 @@ class SettingsConfig(BaseModel):
                 "claude": True,
                 "deepseek": True,
                 "groq": True,
+
+                # LLM 추가
+                "grok": True,
+                "perplexity": True,
+                "poe": True,
+                "mistral": True,
+                "cohere": True,
+                "huggingface": True,
+                "you": True,
+                "openrouter": True,
             },
             "mcp": {
                 "gpt_desktop": True,

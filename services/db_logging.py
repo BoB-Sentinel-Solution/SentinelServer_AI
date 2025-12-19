@@ -47,7 +47,18 @@ LLM_HOST_MAP = {
     "claude": "claude",
     "deepseek": "deepseek",
     "groq": "groq",
+
+    # 추가 LLM
+    "grok": "grok.com",
+    "perplexity": "perplexity.ai",
+    "poe": "poe.com",
+    "mistral": "mistral.ai",
+    "cohere": "cohere.com",
+    "huggingface": "huggingface.co",
+    "you": "you.com",
+    "openrouter": "openrouter.ai",
 }
+
 
 MCP_HOST_MAP = {
     "gpt_desktop": "chatgpt",

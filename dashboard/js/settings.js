@@ -103,7 +103,7 @@
   // config = {
   //   response_method: "mask" | "allow" | "block",
   //   service_filters: {
-  //     llm: { gpt, gemini, claude, deepseek, groq },
+  //     llm: { gpt, gemini, claude, deepseek, groq, ... },
   //     mcp: { gpt_desktop, claude_desktop, vscode_copilot }
   //   }
   // }
@@ -118,12 +118,22 @@
     // response_method
     writeRadio("response_method", cfg.response_method || "mask");
 
-    // LLM
-    setCheck("llm-gpt", !!llm.gpt);
-    setCheck("llm-gemini", !!llm.gemini);
-    setCheck("llm-claude", !!llm.claude);
-    setCheck("llm-deepseek", !!llm.deepseek);
-    setCheck("llm-groq", !!llm.groq);
+    // LLM (기존 5개)
+    setCheck("llm-gpt", llm.gpt !== false);
+    setCheck("llm-gemini", llm.gemini !== false);
+    setCheck("llm-claude", llm.claude !== false);
+    setCheck("llm-deepseek", llm.deepseek !== false);
+    setCheck("llm-groq", llm.groq !== false);
+
+    // ✅ LLM (추가)
+    setCheck("llm-grok", llm.grok !== false);
+    setCheck("llm-perplexity", llm.perplexity !== false);
+    setCheck("llm-poe", llm.poe !== false);
+    setCheck("llm-mistral", llm.mistral !== false);
+    setCheck("llm-cohere", llm.cohere !== false);
+    setCheck("llm-huggingface", llm.huggingface !== false);
+    setCheck("llm-you", llm.you !== false);
+    setCheck("llm-openrouter", llm.openrouter !== false);
 
     // MCP
     setCheck("mcp-gpt-desktop", !!mcp.gpt_desktop);
@@ -145,6 +155,16 @@
           claude: getCheck("llm-claude"),
           deepseek: getCheck("llm-deepseek"),
           groq: getCheck("llm-groq"),
+
+          // ✅ 추가 LLM
+          grok: getCheck("llm-grok"),
+          perplexity: getCheck("llm-perplexity"),
+          poe: getCheck("llm-poe"),
+          mistral: getCheck("llm-mistral"),
+          cohere: getCheck("llm-cohere"),
+          huggingface: getCheck("llm-huggingface"),
+          you: getCheck("llm-you"),
+          openrouter: getCheck("llm-openrouter"),
         },
         mcp: {
           gpt_desktop: getCheck("mcp-gpt-desktop"),
